@@ -25,7 +25,7 @@
 
 ## 📰 News
 
-- **[TBD]** 🚀 SRD code release — stay tuned!
+- **October 2026** 🚀 SRD code release
 
 ## TL;DR
 

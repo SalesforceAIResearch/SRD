@@ -1,92 +1,105 @@
-# Contributor Covenant Code of Conduct
+# Salesforce Open Source Community Code of Conduct
+
+## About the Code of Conduct
+
+Equality is a core value at Salesforce. We believe a diverse and inclusive
+community fosters innovation and creativity, and are committed to building a
+culture where everyone feels included.
+
+Salesforce open-source projects are committed to providing a friendly, safe, and
+welcoming environment for all, regardless of gender identity and expression,
+sexual orientation, disability, physical appearance, body size, ethnicity, nationality,
+race, age, religion, level of experience, education, socioeconomic status, or
+other similar personal characteristics.
+
+The goal of this code of conduct is to specify a baseline standard of behavior so
+that people with different social values and communication styles can work
+together effectively, productively, and respectfully in our open source community.
+It also establishes a mechanism for reporting issues and resolving conflicts.
+
+All questions and reports of abusive, harassing, or otherwise unacceptable behavior
+in a Salesforce open-source project may be reported by contacting the Salesforce
+Open Source Conduct Committee at ossconduct@salesforce.com.
 
 ## Our Pledge
 
-We as members, contributors, maintainers, and leaders of the Miles community pledge to make participation in our project a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, caste, or sexual identity and orientation.
-
-We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, respectful, and healthy technical community.
+In the interest of fostering an open and welcoming environment, we as
+contributors and maintainers pledge to making participation in our project and
+our community a harassment-free experience for everyone, regardless of gender
+identity and expression, sexual orientation, disability, physical appearance,
+body size, ethnicity, nationality, race, age, religion, level of experience, education,
+socioeconomic status, or other similar personal characteristics.
 
 ## Our Standards
 
-Examples of behavior that contributes to a positive environment for the Miles community include:
+Examples of behavior that contributes to creating a positive environment
+include:
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, backgrounds, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility, apologizing to those affected by our mistakes, and learning from the experience
-* Focusing on what is best for the overall community and the long-term health of the project
-* Collaborating in good faith across research, engineering, operations, documentation, and user-support discussions
-* Helping maintain a professional environment in issues, pull requests, discussions, chat channels, meetings, documentation, examples, and community events
+* Using welcoming and inclusive language
+* Being respectful of differing viewpoints and experiences
+* Gracefully accepting constructive criticism
+* Focusing on what is best for the community
+* Showing empathy toward other community members
 
-Examples of unacceptable behavior include:
+Examples of unacceptable behavior by participants include:
 
-* The use of sexualized language or imagery, and sexual attention or advances of any kind
-* Trolling, insulting or derogatory comments, personal attacks, or political attacks unrelated to the project
+* The use of sexualized language or imagery and unwelcome sexual attention or
+advances
+* Personal attacks, insulting/derogatory comments, or trolling
 * Public or private harassment
-* Publishing others' private information, such as a physical address, private email address, phone number, credentials, private logs, or internal deployment details, without explicit permission
-* Deliberately disrupting project work, reviews, discussions, meetings, issue triage, release processes, or community spaces
-* Repeatedly ignoring maintainer guidance, review boundaries, or moderation decisions
-* Other conduct which could reasonably be considered inappropriate in a professional setting
+* Publishing, or threatening to publish, others' private information—such as
+a physical or electronic address—without explicit permission
+* Other conduct which could reasonably be considered inappropriate in a
+professional setting
+* Advocating for or encouraging any of the above behaviors
 
-## Enforcement Responsibilities
+## Our Responsibilities
 
-Community leaders are responsible for clarifying and enforcing our standards of acceptable behavior. They will take appropriate and fair corrective action in response to behavior that they deem inappropriate, threatening, offensive, harmful, or disruptive to the Miles community.
+Project maintainers are responsible for clarifying the standards of acceptable
+behavior and are expected to take appropriate and fair corrective action in
+response to any instances of unacceptable behavior.
 
-Community leaders have the right and responsibility to remove, edit, or reject comments, commits, code, documentation, wiki edits, issues, pull requests, discussions, and other contributions that are not aligned to this Code of Conduct. When appropriate, they will communicate reasons for moderation decisions.
+Project maintainers have the right and responsibility to remove, edit, or
+reject comments, commits, code, wiki edits, issues, and other contributions
+that are not aligned with this Code of Conduct, or to ban temporarily or
+permanently any contributor for other behaviors that they deem inappropriate,
+threatening, offensive, or harmful.
 
 ## Scope
 
-This Code of Conduct applies within all Miles community spaces, including but not limited to:
-
-* GitHub repositories, issues, pull requests, discussions, and review comments
-* Documentation, examples, tutorials, and project websites
-* Community chat channels, mailing lists, forums, and meetings
-* Conferences, meetups, workshops, demos, and other online or offline events connected to the project
-
-This Code of Conduct also applies when an individual is officially representing the Miles project or community in public spaces. Examples of representing the project include using an official project email address, posting through an official social media account, publishing official documentation or release notes, speaking on behalf of the project at an event, or acting as an appointed project representative.
+This Code of Conduct applies both within project spaces and in public spaces
+when an individual is representing the project or its community. Examples of
+representing a project or community include using an official project email
+address, posting via an official social media account, or acting as an appointed
+representative at an online or offline event. Representation of a project may be
+further defined and clarified by project maintainers.
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at:
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported by contacting the Salesforce Open Source Conduct Committee
+at ossconduct@salesforce.com. All complaints will be reviewed and investigated
+and will result in a response that is deemed necessary and appropriate to the
+circumstances. The committee is obligated to maintain confidentiality with
+regard to the reporter of an incident. Further details of specific enforcement
+policies may be posted separately.
 
-miles@radixark.ai
-
-All complaints will be reviewed and investigated promptly and fairly.
-
-All community leaders are obligated to respect the privacy and security of the reporter of any incident. Reports should be handled with appropriate confidentiality, and information should be shared only with those who need it to review, investigate, or resolve the incident.
-
-## Enforcement Guidelines
-
-Community leaders will follow these Community Impact Guidelines in determining the consequences for actions they deem to be in violation of this Code of Conduct.
-
-### 1. Correction
-
-**Community Impact:** Use of inappropriate language or other behavior deemed unprofessional or unwelcome in the community.
-
-**Consequence:** A private, written correction from community leaders, providing clarity around the nature of the violation and an explanation of why the behavior was inappropriate. A public apology may be requested where appropriate.
-
-### 2. Warning
-
-**Community Impact:** A violation through a single incident or a series of actions.
-
-**Consequence:** A warning with consequences for continued behavior. The person may be asked to avoid interaction with the people involved, including unsolicited interaction with those enforcing the Code of Conduct, for a specified period of time. This includes avoiding interactions in community spaces as well as external channels such as social media. Violating these terms may lead to a temporary or permanent ban.
-
-### 3. Temporary Ban
-
-**Community Impact:** A serious violation of community standards, including sustained inappropriate behavior.
-
-**Consequence:** A temporary ban from any sort of interaction or public communication with the Miles community for a specified period of time. No public or private interaction with the people involved, including unsolicited interaction with those enforcing the Code of Conduct, is allowed during this period. Violating these terms may lead to a permanent ban.
-
-### 4. Permanent Ban
-
-**Community Impact:** Demonstrating a pattern of violation of community standards, including sustained inappropriate behavior, harassment of an individual, aggression toward others, or disparagement of classes of individuals.
-
-**Consequence:** A permanent ban from any sort of public interaction within the Miles community.
+Project maintainers who do not follow or enforce the Code of Conduct in good
+faith may face temporary or permanent repercussions as determined by other
+members of the project's leadership and the Salesforce Open Source Conduct
+Committee.
 
 ## Attribution
 
-This Code of Conduct is adapted from the Contributor Covenant, version 2.0, available at:
+This Code of Conduct is adapted from the [Contributor Covenant][contributor-covenant-home],
+version 1.4, available at https://www.contributor-covenant.org/version/1/4/code-of-conduct.html.
+It includes adaptations and additions from [Go Community Code of Conduct][golang-coc],
+[CNCF Code of Conduct][cncf-coc], and [Microsoft Open Source Code of Conduct][microsoft-coc].
 
-https://www.contributor-covenant.org/version/2/0/code_of_conduct.html
+This Code of Conduct is licensed under the [Creative Commons Attribution 3.0 License][cc-by-3-us].
 
-Community Impact Guidelines were inspired by Mozilla's code of conduct enforcement ladder.
+[contributor-covenant-home]: https://www.contributor-covenant.org
+[golang-coc]: https://golang.org/conduct
+[cncf-coc]: https://github.com/cncf/foundation/blob/master/code-of-conduct.md
+[microsoft-coc]: https://opensource.microsoft.com/codeofconduct/
+[cc-by-3-us]: https://creativecommons.org/licenses/by/3.0/us/
