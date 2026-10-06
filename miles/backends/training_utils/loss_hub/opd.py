@@ -29,6 +29,12 @@ def apply_opd_kl_to_advantages(
     if student_log_probs is None:
         return
 
+    # SDPO KD-loss mode applies the distillation as a real loss term in
+    # policy_loss_function (not via the advantage), and produces neither
+    # opd_reverse_kl nor teacher_log_probs here — so the advantage hook is a no-op.
+    if getattr(args, "sdpo_kd_loss", False):
+        return
+
     precomputed_reverse_kls = rollout_data.get("opd_reverse_kl")
     if precomputed_reverse_kls is not None:
         if len(advantages) != len(precomputed_reverse_kls):

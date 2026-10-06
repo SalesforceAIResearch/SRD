@@ -1,0 +1,24 @@
+# --eval-config for the FUNCTIONAL (leetcode-style) LiveCodeBench slice, graded by judge.py's
+# functional harness. Kept separate from eval_code.yaml (stdin slice): different grading path,
+# and this slice has never appeared in any --testtype stdin training mix (held-out).
+#
+# Built by (see ablation/eval-lcb-functional.sh, which does this for you):
+#   python -m examples.SRD.data.build_code_data \
+#     --out-dir $LCB_FUNC_DATA_DIR --jsonl-files test6.jsonl \
+#     --testtype functional --difficulty easy,medium,hard \
+#     --include-private-tests --max-test-chars 20000 --n-train 0 --n-eval 100
+eval:
+  defaults:
+    # Per-turn generation budget. Raise it (32768 fits the 81920 context) on hard
+    # problems where 16384 truncates the sample inside its first reasoning block.
+    max_response_len: ${oc.decode:${oc.env:LCB_FUNC_MAX_RESPONSE_LEN,16384}}
+    top_p: 1.0
+    tool_key: tools
+    metadata_key: metadata
+  datasets:
+    - name: livecodebench_v6_functional
+      path: ${oc.env:LCB_FUNC_DATA_DIR,/root/data/code_data_v6func_all}/livecodebench_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}

@@ -194,3 +194,9 @@ _examples_synced/
 .DS_Store
 
 .humanize/
+sdpo_dumps/
+examples/TTS/logs
+examples/SRD/explog.jsonl
+examples/SRD/ablation/explog.jsonl
+examples/SRD/ablation/explog.jsonl
+.claude/

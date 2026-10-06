@@ -211,6 +211,7 @@ def forward_only(
     data_iterator: Sequence[DataIterator],
     num_microbatches: Sequence[int],
     store_prefix: str = "",
+    f_kwargs: dict | None = None,
 ) -> dict[str, list[torch.Tensor]]:
     """Run forward passes only and collect non-loss outputs (e.g., logprobs).
 
@@ -293,6 +294,7 @@ def forward_only(
             response_lengths=response_lengths,
             with_entropy=args.use_rollout_entropy,
             max_seq_lens=batch.get("max_seq_lens", None),
+            **(f_kwargs or {}),
         )
 
     # Turn on evaluation mode which disables dropout.
@@ -417,6 +419,10 @@ def train_one_step(
                 "rollout_log_probs",
                 "max_seq_lens",
                 "opd_reverse_kl",
+                "sdpo_teacher_topk_logprobs",
+                "sdpo_teacher_topk_ids",
+                "sdpo_is_skill",
+                "sdpo_skill_is_correct",
             ],
             args.data_pad_size_multiplier,
             args.qkv_format,

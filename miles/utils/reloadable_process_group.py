@@ -11,6 +11,62 @@ logger = logging.getLogger(__name__)
 
 old_new_group_dict = {}
 
+_dist_checkpointing_merge_patched = False
+
+
+def monkey_patch_dist_checkpointing_merge():
+    """Widen Megatron's dist_checkpointing dict_utils.merge() optimizer
+    param_state truncation to BOTH directions.
+
+    Megatron's own merge() (dict_utils.py) already special-cases optimizer
+    param_state lists: if the loaded checkpoint's list (`x2`, on-disk) is
+    SHORTER than the current run's expected list (`x1`), the extra padding
+    entries on `x1` are truncated -- this is the "dp_reshardable padding"
+    case the upstream comment describes. But under TP-reshaped resume (e.g.
+    loading a checkpoint saved at a different TP than the current run) the
+    on-disk list can instead be LONGER than the current run's expected list
+    (observed live: x1=93 (current, real) vs x2=196 (on-disk, padded) ->
+    ValueError, not the case upstream's guard covers). Since both directions
+    are the SAME padding-mismatch situation -- just observed from either
+    side -- truncate whichever side is longer, not only x1.
+    """
+    global _dist_checkpointing_merge_patched
+    if _dist_checkpointing_merge_patched:
+        return
+    _dist_checkpointing_merge_patched = True
+
+    from megatron.core.dist_checkpointing import dict_utils, serialization, tensor_aware_state_dict
+
+    original_merge = dict_utils.merge
+
+    def merge(x1, x2, key=()):
+        if (
+            isinstance(x1, list)
+            and isinstance(x2, list)
+            and len(x1) != len(x2)
+            and dict_utils._is_optimizer_param_state_key(key)
+        ):
+            if len(x2) > len(x1):
+                logger.info(
+                    f"dist_checkpointing merge: truncating on-disk optimizer param_state "
+                    f"list at {key} from {len(x2)} to {len(x1)} entries (checkpoint was "
+                    f"saved under a different parallel layout)."
+                )
+                del x2[len(x1) :]
+        return original_merge(x1, x2, key=key)
+
+    # `merge` is recursive via a BARE name lookup inside dict_utils.py itself, so
+    # rebinding the module attribute is enough for that recursion. But
+    # serialization.py / tensor_aware_state_dict.py did `from .dict_utils import
+    # merge` -- a name binding at import time -- so their `merge` name is frozen to
+    # the pre-patch function object and rebinding dict_utils.merge alone would be
+    # invisible at their call sites (exactly where checkpoint load calls merge()).
+    # Patch every module-level name too.
+    dict_utils.merge = merge
+    serialization.merge = merge
+    tensor_aware_state_dict.merge = merge
+    logger.info("Applying monkey patch to megatron.core.dist_checkpointing.dict_utils.merge")
+
 
 def monkey_patch_torch_dist():
     pid = os.getpid()

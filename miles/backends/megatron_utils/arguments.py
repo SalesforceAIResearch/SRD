@@ -2,7 +2,25 @@ import logging
 import os
 
 from megatron.training.arguments import parse_args, validate_args
-from megatron.training.tokenizer.tokenizer import _vocab_size_with_padding
+
+try:
+    from megatron.training.tokenizer.tokenizer import _vocab_size_with_padding
+except ImportError:
+    # Megatron-LM trees from ~2026-08-27 on dropped megatron/training/tokenizer/
+    # (tokenizers moved under megatron.core.tokenizers) and re-homed the vocab
+    # padding helper in megatron/training/vocab_utils.py with an explicit
+    # signature instead of an `args` blob. Same arithmetic, so shim it rather
+    # than pin the container: without this, `import train` dies at
+    # ModuleNotFoundError before parse_args on any newer image.
+    from megatron.training.vocab_utils import calculate_padded_vocab_size
+
+    def _vocab_size_with_padding(orig_vocab_size, args, logging_enabled=True):
+        return calculate_padded_vocab_size(
+            orig_vocab_size,
+            args.make_vocab_size_divisible_by,
+            args.tensor_model_parallel_size,
+            logging_enabled=logging_enabled,
+        )
 
 __all__ = ["validate_args", "parse_args", "set_default_megatron_args"]
 

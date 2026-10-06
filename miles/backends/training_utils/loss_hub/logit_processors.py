@@ -4,7 +4,10 @@ from collections.abc import Iterator
 import torch
 
 from miles.backends.training_utils.cp_utils import allgather_cp_redistribute, get_logits_and_tokens_offset_with_cp
-from miles.backends.training_utils.loss_hub.math_utils import calculate_log_probs_and_entropy
+from miles.backends.training_utils.loss_hub.math_utils import (
+    _gather_true_on_policy_full_logits,
+    calculate_log_probs_and_entropy,
+)
 from miles.backends.training_utils.parallel import get_parallel_state
 
 
@@ -207,6 +210,60 @@ def get_log_probs_and_entropy(
         )
 
     return res
+
+
+def get_topk_logprobs(
+    logits: torch.Tensor,
+    *,
+    args: Namespace,
+    unconcat_tokens: list[torch.Tensor],
+    total_lengths: list[int],
+    response_lengths: list[int],
+    with_entropy: bool = False,
+    non_loss_data: bool = True,
+    max_seq_lens: list[int] | None = None,
+    sdpo_topk: int = 128,
+) -> dict[str, list[torch.Tensor]]:
+    """Per-response-token top-k log-probabilities over the FULL vocab.
+
+    For SDPO distribution-level KL/JSD. For each sample, over the response span,
+    computes a full-vocab log-softmax and returns the per-position top-k ids and
+    their log-probs (each ``[R, k]``). Called separately for the student (no
+    prefix) and teacher (with prefix) passes; the two are aligned onto a common
+    token set (the union of their ids) and turned into a JSD/KL on the training
+    side (see actor._compute_sdpo_teacher_log_probs).
+
+    Runs under no_grad (this is a target signal, not part of the policy loss
+    graph). TP vocab-parallel logits are all-gathered to full vocab first.
+    Results are moved to CPU to keep the per-position [R, k] tensors off the GPU.
+    """
+    parallel_state = get_parallel_state()
+    tp_group = parallel_state.tp.group
+    topk_logprobs_list: list[torch.Tensor] = []
+    topk_ids_list: list[torch.Tensor] = []
+
+    for logits_chunk, _tokens_chunk in get_responses(
+        logits,
+        args=args,
+        unconcat_tokens=unconcat_tokens,
+        total_lengths=total_lengths,
+        response_lengths=response_lengths,
+        max_seq_lens=max_seq_lens,
+    ):
+        with torch.no_grad():
+            if logits_chunk.size(0) == 0:
+                topk_logprobs_list.append(torch.zeros((0, sdpo_topk)))
+                topk_ids_list.append(torch.zeros((0, sdpo_topk), dtype=torch.long))
+                continue
+            full_logits = _gather_true_on_policy_full_logits(
+                logits_chunk.contiguous(), tp_group, vocab_size=getattr(args, "vocab_size", None)
+            )
+            log_probs = torch.log_softmax(full_logits.float(), dim=-1)  # [R, V]
+            vals, ids = torch.topk(log_probs, k=min(sdpo_topk, log_probs.size(-1)), dim=-1)
+            topk_logprobs_list.append(vals.cpu())
+            topk_ids_list.append(ids.cpu())
+
+    return {"sdpo_topk_logprobs": topk_logprobs_list, "sdpo_topk_ids": topk_ids_list}
 
 
 def get_values(

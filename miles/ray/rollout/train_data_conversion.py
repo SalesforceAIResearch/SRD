@@ -59,6 +59,15 @@ def convert_samples_to_train_data(
     if samples[0].metadata and "raw_reward" in samples[0].metadata:
         train_data["raw_reward"] = [sample.metadata["raw_reward"] for sample in samples]
 
+    # SDPO pure-distill zeroes the task reward (raw_reward all 0), so pass@k would
+    # read as 0. The true per-trace correctness is stashed on metadata; thread it
+    # through so log_passrate can report the real pass@k.
+    if samples[0].metadata and "sdpo_correct" in samples[0].metadata:
+        train_data["sdpo_correct"] = [
+            sample.metadata.get("sdpo_correct", 0.0) if isinstance(sample.metadata, dict) else 0.0
+            for sample in samples
+        ]
+
     # For rollout buffer
     if samples[0].metadata and "round_number" in samples[0].metadata:
         train_data["round_number"] = [sample.metadata["round_number"] for sample in samples]
@@ -87,6 +96,46 @@ def convert_samples_to_train_data(
 
     if samples[0].opd_reverse_kl is not None:
         train_data["opd_reverse_kl"] = [sample.opd_reverse_kl for sample in samples]
+
+    # SDPO megatron-teacher path: the FULL teacher prompt token ids (system +
+    # user-with-peer-solution + assistant marker) built during reward, forwarded
+    # to the training side where teacher log-probs are computed with the current
+    # policy over teacher_prompt + response.
+    if samples[0].metadata and "sdpo_teacher_prompt_tokens" in samples[0].metadata:
+        train_data["sdpo_teacher_prompt_tokens"] = [
+            (sample.metadata or {}).get("sdpo_teacher_prompt_tokens", []) for sample in samples
+        ]
+
+    # SDPO trace-condense / self-skill: the skill text used as the teacher prefix,
+    # forwarded so the training-side dump can log it.
+    # NOTE: skill fields are set only on skill-ELIGIBLE samples, which may not
+    # include samples[0]. Test ANY sample, not just the first, or the whole field
+    # gets silently dropped whenever sample 0 happens to be ineligible.
+    # sdpo_skill (final skill text; in pitfall-condense mode this is the problem-only
+    # prediction), plus the raw per-trace pitfall (before any overwrite) and the
+    # group's shared common-pitfall summary — all forwarded so the training-side dump
+    # can log them.
+    for _skill_text_key in ("sdpo_skill", "sdpo_trace_pitfall", "sdpo_trace_skill", "sdpo_group_pitfalls"):
+        if any(isinstance(s.metadata, dict) and _skill_text_key in s.metadata for s in samples):
+            train_data[_skill_text_key] = [
+                (sample.metadata or {}).get(_skill_text_key, "") if isinstance(sample.metadata, dict) else ""
+                for sample in samples
+            ]
+
+    # SDPO skill-KD: the self-generated skill's tokens + its student/teacher prompts +
+    # old logprobs, forwarded so the training side can run the second KD on the skill.
+    # Only present when --sdpo-skill-kd is on (and per-sample only when eligible).
+    for _skill_key in (
+        "sdpo_skill_tokens",
+        "sdpo_skill_prompt_tokens",
+        "sdpo_skill_teacher_prompt_tokens",
+        "sdpo_skill_rollout_logprobs",
+    ):
+        if any(isinstance(s.metadata, dict) and _skill_key in s.metadata for s in samples):
+            train_data[_skill_key] = [
+                (sample.metadata or {}).get(_skill_key, []) if isinstance(sample.metadata, dict) else []
+                for sample in samples
+            ]
 
     x = metadata.get("dynamic_global_batch_size")
     assert args.use_dynamic_global_batch_size == (x is not None)
@@ -157,6 +206,15 @@ def split_train_data_by_dp(args, data, dp_size):
             "prompt",
             "teacher_log_probs",
             "opd_reverse_kl",
+            "sdpo_teacher_prompt_tokens",
+            "sdpo_skill",
+            "sdpo_trace_pitfall",
+            "sdpo_trace_skill",
+            "sdpo_group_pitfalls",
+            "sdpo_skill_tokens",
+            "sdpo_skill_prompt_tokens",
+            "sdpo_skill_teacher_prompt_tokens",
+            "sdpo_skill_rollout_logprobs",
             "weight_versions",
         ]:
             if key not in data:
@@ -166,6 +224,7 @@ def split_train_data_by_dp(args, data, dp_size):
         # keys that need to be splited at train side
         for key in [
             "raw_reward",
+            "sdpo_correct",
             "total_lengths",
             "dynamic_global_batch_size",
         ]:

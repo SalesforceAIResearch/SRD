@@ -1,0 +1,30 @@
+# --eval-config for the MULTITASK domain -- MINIMAL in-training monitor (one held-out dataset per domain, 193 prompts).
+# FULL suite is eval_multitask_full.yaml (SDPO_REACT_EVAL_CONFIG=eval_multitask_full).
+# Paths are CONTAINER paths (/root/data == the enroot mount of /fsx/data/$USER).
+
+eval:
+  defaults:
+    max_response_len: 16384
+    top_p: 1.0
+    tool_key: tools
+    metadata_key: metadata
+  datasets:
+    - name: aime26
+      path: ${oc.env:AIME_DATA_DIR,/root/data/aime}/aime26_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}
+    - name: livecodebench_v6_functional
+      path: ${oc.env:LCB_FUNC_DATA_DIR,/root/data/code_data_v6func_all}/livecodebench_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}
+    # --- search ---
+    - name: hotpotqa
+      path: /root/data/search_data/hotpotqa_val.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}

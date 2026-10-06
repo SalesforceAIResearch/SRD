@@ -5,15 +5,22 @@ from torch.utils.checkpoint import checkpoint
 
 from miles.backends.training_utils.cp_utils import get_sum_of_sample_mean
 from miles.backends.training_utils.loss_hub.advantages import compute_advantages, normalize_advantages
-from miles.backends.training_utils.loss_hub.logit_processors import get_log_probs_and_entropy, get_values  # noqa: F401
+from miles.backends.training_utils.loss_hub.logit_processors import (  # noqa: F401
+    get_log_probs_and_entropy,
+    get_topk_logprobs,
+    get_values,
+)
 from miles.backends.training_utils.loss_hub.losses import get_loss_function
 from miles.backends.training_utils.loss_hub.math_utils import compute_approx_kl
 from miles.backends.training_utils.loss_hub.opd import apply_opd_kl_to_advantages
+from miles.backends.training_utils.loss_hub.rlsd import apply_rlsd_credit_to_advantages
 from miles.backends.training_utils.parallel import get_parallel_state
 from miles.utils.types import RolloutBatch
 
 
-def compute_advantages_and_returns(args: Namespace, rollout_data: RolloutBatch) -> None:
+def compute_advantages_and_returns(
+    args: Namespace, rollout_data: RolloutBatch, rollout_id: int | None = None
+) -> None:
     """Compute advantages and returns in-place based on `args.advantage_estimator`.
 
     This function extracts rewards, log-probs, values, and masks from
@@ -73,6 +80,24 @@ def compute_advantages_and_returns(args: Namespace, rollout_data: RolloutBatch) 
         values=values,
     )
 
+    # EPO: fuse the per-token PMI credit weight into the GRPO advantages
+    # (A(t) = credit_t * (R - baseline)), computed by
+    # MegatronTrainRayActor._compute_epo_credit and written to
+    # rollout_data["epo_credit"] (one [R] tensor per sample, aligned with
+    # `advantages`). This rides the existing advantages pipe with no new
+    # plumbing into policy_loss_function; orthogonal to (applied before) OPD/
+    # whitening, exactly like the direction (reward-baseline) is untouched.
+    if getattr(args, "epo_credit_loss", False):
+        epo_credit = rollout_data.get("epo_credit")
+        if epo_credit is not None:
+            assert len(epo_credit) == len(advantages), (
+                f"EPO credit length mismatch: epo_credit={len(epo_credit)}, advantages={len(advantages)}."
+            )
+            advantages = [
+                adv * credit.to(device=adv.device, dtype=adv.dtype)
+                for adv, credit in zip(advantages, epo_credit, strict=True)
+            ]
+
     # Apply on-policy distillation KL penalty to advantages (orthogonal to advantage estimator)
     if args.use_opd:
         apply_opd_kl_to_advantages(
@@ -80,6 +105,20 @@ def compute_advantages_and_returns(args: Namespace, rollout_data: RolloutBatch) 
             rollout_data=rollout_data,
             advantages=advantages,
             student_log_probs=log_probs,
+        )
+
+    # RLSD (arXiv:2604.03128): multiplicative advantage reweighting by the
+    # self-teacher's evidence ratio -- see loss_hub/rlsd.py's module docstring
+    # for why this differs from --sdpo-kd-loss's additive KD loss and
+    # --use-opd's additive KL-in-advantage (mutually exclusive with both,
+    # enforced in arguments.py).
+    if getattr(args, "sdpo_rlsd", False):
+        apply_rlsd_credit_to_advantages(
+            args=args,
+            rollout_data=rollout_data,
+            advantages=advantages,
+            student_log_probs=log_probs,
+            rollout_id=rollout_id,
         )
 
     if args.normalize_advantages:

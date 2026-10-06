@@ -207,6 +207,13 @@ class SessionCore:
             # Must be False so stop-token text is trimmed from assistant content;
             # token IDs still come from logprobs below.
             request_body["no_stop_trim"] = False
+            # An external agent (e.g. tau2's LLMAgent) may omit max_tokens
+            # entirely, letting a single turn generate unbounded -- unlike
+            # miles.rollout.generate_hub's own callers, this proxy path has no
+            # other place to enforce --rollout-max-response-len. setdefault
+            # (not hardcoded) so an agent-supplied max_tokens still wins.
+            if (max_response_len := getattr(self.args, "rollout_max_response_len", None)) is not None:
+                request_body.setdefault("max_tokens", max_response_len)
 
             request_messages = request_body.get("messages", [])
             prompt_token_ids = session.prepare_pretokenized(

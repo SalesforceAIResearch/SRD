@@ -1,5 +1,7 @@
 import logging
 import os
+import secrets
+import string
 from copy import deepcopy
 
 import wandb
@@ -47,9 +49,12 @@ def init_wandb_primary(args):
         wandb.login(key=args.wandb_key, host=args.wandb_host)
 
     # Prepare wandb init parameters
-    # add random 6 length string with characters
+    # add random 8 length string with characters -- generated locally, not via
+    # wandb.util.generate_id(), which is an undocumented internal that moved/
+    # vanished across wandb versions (AttributeError on some container pulls).
     if args.wandb_random_suffix:
-        group = args.wandb_group + "_" + wandb.util.generate_id()
+        suffix = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(8))
+        group = args.wandb_group + "_" + suffix
         run_name = f"{group}-RANK_{args.rank}"
     else:
         group = args.wandb_group
@@ -160,10 +165,40 @@ def init_wandb_secondary(args, router_addr=None):
 def _init_wandb_common():
     wandb.define_metric("train/step")
     wandb.define_metric("train/*", step_metric="train/step")
+    # loss/* is logged in the same call as train/* (step_key="train/step"), so it
+    # must share that step axis — otherwise wandb falls back to its internal global
+    # _step (which increments on every wandb.log call, ~5x per rollout) and the
+    # x-axis looks multiplied by ~5.
+    wandb.define_metric("loss/*", step_metric="train/step")
     wandb.define_metric("rollout/step")
     wandb.define_metric("rollout/*", step_metric="rollout/step")
+    # response_len/* is logged alongside rollout/* (step_key="rollout/step").
+    wandb.define_metric("response_len/*", step_metric="rollout/step")
+    # All skill/* metrics live in a top-level skill/ panel. The rollout-side ones
+    # (length/ppl/count/response_prefix_is_skill_frac) share the rollout/step axis;
+    # the train-side ones (entropy/kl) share the train/step axis.
+    wandb.define_metric("skill/length_mean", step_metric="rollout/step")
+    wandb.define_metric("skill/length_min", step_metric="rollout/step")
+    wandb.define_metric("skill/length_max", step_metric="rollout/step")
+    wandb.define_metric("skill/count", step_metric="rollout/step")
+    wandb.define_metric("skill/ppl", step_metric="rollout/step")
+    wandb.define_metric("skill/response_prefix_is_skill_frac", step_metric="rollout/step")
+    wandb.define_metric("skill/entropy", step_metric="train/step")
+    wandb.define_metric("skill/kl", step_metric="train/step")
+    # skill/kl split by provenance (correct-trace self-success/blind-correct vs
+    # failed-trace pitfall-condense) -- see losses.py's skill_correct_tok_mask.
+    wandb.define_metric("skill/kl_correct", step_metric="train/step")
+    wandb.define_metric("skill/kl_pitfall", step_metric="train/step")
     wandb.define_metric("multi_turn/*", step_metric="rollout/step")
+    # domain/* = per-task-type (math/code/search) train breakdown, logged
+    # alongside rollout/* (step_key="rollout/step"). Without this binding it
+    # falls back to wandb's internal _step (increments per wandb.log call,
+    # ~5-7x/rollout) -> jumpy x-axis (1,7,13,19,...). Bind it to rollout/step.
+    wandb.define_metric("domain/*", step_metric="rollout/step")
     wandb.define_metric("passrate/*", step_metric="rollout/step")
     wandb.define_metric("eval/step")
     wandb.define_metric("eval/*", step_metric="eval/step")
+    # val-core/* and val-aux/* are logged alongside eval/* (step_key="eval/step").
+    wandb.define_metric("val-core/*", step_metric="eval/step")
+    wandb.define_metric("val-aux/*", step_metric="eval/step")
     wandb.define_metric("perf/*", step_metric="rollout/step")

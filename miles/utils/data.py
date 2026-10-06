@@ -183,6 +183,7 @@ class Dataset:
         seed=42,
         apply_chat_template=False,
         apply_chat_template_kwargs=None,
+        tool_specs_resolver=None,
     ):
         origin_samples = []
         for data in read_file(path):
@@ -191,15 +192,33 @@ class Dataset:
             prompt = _build_messages(data, prompt_key, as_conversation, multimodal_keys)
 
             metadata = data.get(metadata_key) or {}
-            tools = None
-            if tool_key is not None and tool_key in data:
-                tools = data[tool_key]
-                if isinstance(tools, str):
-                    tools = json.loads(tools)
-                elif isinstance(tools, np.ndarray):
-                    tools = tools.tolist()
-                assert isinstance(tools, list), f"tools must be a list, got {type(tools)} instead"
+            # tool_specs_resolver (--tool-specs-resolver-path) takes precedence over
+            # a row-baked tool_key field: it re-derives the CURRENT tool specs from
+            # the live tool registry every time this Dataset is constructed (once
+            # per rollout-actor/eval-cache-key startup), so a jsonl built by an
+            # older checkout of that registry never renders a stale `<tools>` block
+            # -- the bug this resolver exists to prevent (a data-build-time snapshot
+            # silently outliving a later tool rename/removal in the registry).
+            if tool_specs_resolver is not None:
+                # load_function dereferences --tool-specs-resolver-path to whatever
+                # object lives at that module attribute -- a plain list (e.g. a
+                # registry's module-level `all_tool_specs`) or a zero-arg callable
+                # (e.g. an env-driven `active_tool_specs()`). Support both so this
+                # can point at the SAME path already used for
+                # --generate-tool-specs-path without a second, list-only variant.
+                tools = tool_specs_resolver() if callable(tool_specs_resolver) else tool_specs_resolver
+                assert isinstance(tools, list), f"tool_specs_resolver must resolve to a list, got {type(tools)} instead"
                 metadata["tools"] = tools
+            else:
+                tools = None
+                if tool_key is not None and tool_key in data:
+                    tools = data[tool_key]
+                    if isinstance(tools, str):
+                        tools = json.loads(tools)
+                    elif isinstance(tools, np.ndarray):
+                        tools = tools.tolist()
+                    assert isinstance(tools, list), f"tools must be a list, got {type(tools)} instead"
+                    metadata["tools"] = tools
 
             if apply_chat_template:
                 output_prompt = chat_template_utils.apply_chat_template(
@@ -282,5 +301,18 @@ def process_rollout_data(args, rollout_data_ref, dp_rank, dp_size):
     # save the seqlen of the whole rollout batch
     Timer().seq_lens = total_lengths
     rollout_data["total_lengths"] = [total_lengths[i] for i in partition]
+
+    # sdpo_correct (like raw_reward) is deliberately left GLOBAL/unpartitioned in
+    # train_data_conversion.py::split_train_data_by_dp -- log_passrate needs the
+    # full rollout_batch_size x n_samples_per_prompt shape to compute pass@k, so
+    # we must NOT reorder rollout_data["sdpo_correct"] itself. But per-sample dump
+    # code (e.g. MegatronTrainRayActor._dump_sdpo_prompts) indexes rollout_data
+    # with THIS rank's LOCAL index (0..len(tokens)-1, same as tokens/sdpo_skill/
+    # sdpo_trace_pitfall/sdpo_group_pitfalls, which ARE partitioned here). Stash a
+    # local-order copy under a separate key (partition is popped above and would
+    # otherwise be unavailable to those call sites) so such code can align
+    # correctness to the right sample without touching log_passrate's input.
+    if "sdpo_correct" in rollout_data:
+        rollout_data["sdpo_correct_local"] = [rollout_data["sdpo_correct"][i] for i in partition]
 
     return rollout_data

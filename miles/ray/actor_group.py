@@ -1,4 +1,5 @@
 import asyncio
+import glob
 import os
 
 import ray
@@ -68,11 +69,19 @@ class RayTrainGroup:
         if self.args.offload_train and self.args.train_backend == "megatron":
             import torch_memory_saver
 
-            dynlib_path = os.path.join(
-                os.path.dirname(os.path.dirname(torch_memory_saver.__file__)),
-                "torch_memory_saver_hook_mode_preload.abi3.so",
+            dynlib_dir = os.path.dirname(os.path.dirname(torch_memory_saver.__file__))
+            # The compiled preload hook's filename varies by torch_memory_saver
+            # build: some ship it unsuffixed (torch_memory_saver_hook_mode_
+            # preload.abi3.so), others suffix it by CUDA version (..._cu12.
+            # abi3.so, observed on torch_memory_saver==0.0.9.post1). Glob for
+            # either rather than hardcoding one exact name, so this doesn't
+            # break every time the installed build's naming convention shifts.
+            candidates = sorted(glob.glob(os.path.join(dynlib_dir, "torch_memory_saver_hook_mode_preload*.abi3.so")))
+            assert candidates, (
+                f"No torch_memory_saver_hook_mode_preload*.abi3.so found under {dynlib_dir} "
+                f"(torch_memory_saver=={getattr(torch_memory_saver, '__version__', '?')})."
             )
-            assert os.path.exists(dynlib_path), f"LD_PRELOAD so file {dynlib_path} does not exist."
+            dynlib_path = candidates[0]
 
             env_vars["LD_PRELOAD"] = dynlib_path
             env_vars["TMS_INIT_ENABLE"] = "1"

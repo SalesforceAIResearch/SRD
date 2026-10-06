@@ -91,6 +91,51 @@ class DistBucketedWeightUpdateMixin:
                 is_lora=True,
             )
 
+    def _get_base_hf_weight_iterator(self) -> HfWeightIteratorBase:
+        """Lazily build (and cache) the base-weight HF iterator for ``bridge`` mode.
+
+        The direct (``raw``) mode never touches this — it uses the hand-written
+        ``convert_to_hf`` converters below. Bridge mode delegates the whole
+        Megatron→HF conversion (incl. TP/EP gather and Mamba layers) to AutoBridge,
+        the same iterator colocate (`UpdateWeightFromTensor`) already uses; this is
+        what makes architectures without a hand-written converter (e.g. nemotron_h)
+        work over the distributed transports too.
+        """
+        it = getattr(self, "_base_hf_weight_iterator", None)
+        if it is None:
+            it = HfWeightIteratorBase.create(
+                args=self.args,
+                model=self.model,
+                model_name=self.model_name,
+                quantization_config=self.quantization_config,
+                is_lora=False,
+            )
+            self._base_hf_weight_iterator = it
+        return it
+
+    def _gather_and_update_weights_via_bridge(
+        self,
+        update_bucket_weight_func: Callable[[list[tuple[str, torch.Tensor]], tqdm | None], None],
+        pbar: tqdm | None = None,
+    ) -> None:
+        """Bridge (AutoBridge) HF export path — the single-pass counterpart of the
+        non-expert + expert split below.
+
+        The bridge exports every parameter (expert and non-expert) in one pass,
+        TP/EP-gathering internally, so there is no separate expert phase (mirrors
+        colocate's `UpdateWeightFromTensor`). Passing ``{}`` makes the bridge export
+        straight from ``self.model`` (the distributed transports hold live actor
+        weights on dedicated train GPUs; same convention as the LoRA sync path).
+
+        All ranks must iterate the bridge for the internal TP/EP collectives; only
+        source ranks transmit — matching the ``if not self._is_source`` gating and
+        the transport-specific ``_update_weight_implementation``.
+        """
+        for hf_named_tensors in self._get_base_hf_weight_iterator().get_hf_weight_chunks({}, weight_type="base"):
+            if not self._is_source:
+                continue
+            update_bucket_weight_func(list(hf_named_tensors), pbar)
+
     def _gather_and_update_non_expert_weights(
         self,
         update_bucket_weight_func: Callable[[list[tuple[str, torch.Tensor]], tqdm | None], None],
@@ -101,6 +146,11 @@ class DistBucketedWeightUpdateMixin:
         Non-expert: gather TP → rm pad → HF → buffer (flush if full). All gather, PP source buffers.
         After `all_gather`, update weights/buffer_size on source, do nothing on non-source.
         """
+        # Bridge mode exports all params (expert + non-expert) in one pass here;
+        # `_gather_and_update_expert_weights` becomes a no-op (see below).
+        if self.args.megatron_to_hf_mode == "bridge":
+            self._gather_and_update_weights_via_bridge(update_bucket_weight_func, pbar)
+            return
 
         buffer_size = 0
         converted_named_tensors: list[tuple[str, torch.Tensor]] = []
@@ -134,6 +184,11 @@ class DistBucketedWeightUpdateMixin:
         Bucketed TP + EP all-gather + HF conversion for expert parameters.
         Expert: gather TP → rm pad → buffer. EP gather + HF deferred. Threshold × EP size.
         """
+        # Bridge mode already exported experts in the single-pass non-expert phase.
+        # (p2p's override still runs its post-pass wait_transfers() after this returns.)
+        if self.args.megatron_to_hf_mode == "bridge":
+            return
+
         buffer_size = 0
         named_tensors: list[tuple[str, torch.Tensor]] = []
 

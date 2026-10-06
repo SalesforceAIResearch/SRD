@@ -1,161 +1,236 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/radixark/miles/main/imgs/miles_logo.png" alt="Miles Logo" width="550">
+# 🔭 Self-Retrospection Distillation
+### Prospective Learning: Turning Post-hoc Experiences into Prior Foresight
 
-### **Enterprise-Grade Reinforcement Learning for Large-Scale Model Training**
-### **High-Performance Rollout • Low Precision Training • Production Stability**
+<p align="center">
+  <b>Haoxiang Zhang*</b>, <b>Qinglin Chen*</b>, <b>Hiroaki Hayashi*</b>, <b>Zhuofeng Li*</b>, <b>Siming Zhang*</b><br>
+  Jiaxin Zhang, Jixuan Chen, Fang Wu, Pan Lu, Silvio Savarese, Julian McAuley, Chien-Sheng Wu
+</p>
 
-[![GitHub Repo](https://img.shields.io/badge/github-radixark%2Fmiles-black?logo=github)](https://github.com/radixark/miles)
-[![License](https://img.shields.io/github/license/radixark/miles)](LICENSE)
-[![Slack](https://img.shields.io/badge/slack-join-brightgreen.svg)](https://slack.sglang.ai)
+<p align="center">
+  <em>Salesforce AI Research · UC San Diego · Texas A&amp;M University · Stanford University</em>
+</p>
 
-[**Latest Updates**](#latest-updates) | [**Quick Start**](#quick-start) | [**Key Features**](#key-features) | [**Documentation**](https://miles.radixark.com/docs)
+<a href="#"><img src="https://img.shields.io/badge/arXiv-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="arXiv"></a>
+<a href="#"><img src="https://img.shields.io/badge/Project-1F72B8?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
+<a href="#"><img src="https://img.shields.io/badge/Github-181717?style=for-the-badge&logo=github&logoColor=white" alt="Github"></a>
+
+<!-- Add the method teaser here once finalized, e.g.:
+<img src="docs/assets/srd-teaser.png" alt="SRD overview" width="85%"/> -->
 
 </div>
 
 ---
 
+## 📰 News
 
-## Latest Updates
+- **[TBD]** 🚀 SRD code release — stay tuned!
 
-*   **[2026/02]** 💡 **Miles Detailed Arguments**: We've added a detailed command-line argument guide used to configure Miles for RL training and inference. These arguments enable precise control over cluster resources, training backends (Megatron/FSDP), inference optimization via SGLang, and RL algorithmic hyperparameters. [Link](https://miles.radixark.com/docs/user-guide/cli-reference)
-*   **[2026/01]** 💎 **INT4 Quantization-Aware Training (QAT)**: Inspired by the Kimi K2-Thinking report, Miles now features a full-stack INT4 W4A16 QAT pipeline. This allows 1TB-scale models to fit into single-machine VRAM (e.g., NVIDIA H200), doubling rollout efficiency by eliminating cross-node bottlenecks while maintaining BF16-equivalent accuracy. [Blog](https://lmsys.org/blog/2026-01-26-int4-qat/)
-*   **[2026/01]** 💎 **Unified VLM/LLM Multi-Turn Training**: We provided an implementation for the VLM multi-turn sampling paradigm. Developers only need to write a customized `rollout` function to easily start multi-turn RL for VLM, just like training LLM. [Blog](https://github.com/zhaochenyang20/Awesome-ML-SYS-Tutorial/blob/main/rlhf/slime/vlm-multi-turn/readme-en.md)
-*   **[2026/01]** 🤖 **Multi-Agent Co-Evolution**: Miles now supports **MrlX**, a novel asynchronous co-evolutionary framework for Multi-Agent RL. Achieve superior performance in complex tasks like Doctor-Patient simulations and DeepResearch pipelines by enabling specialized agents to evolve together symbiotically. [[Link]](https://github.com/AQ-MedAI/MrlX)
-*   **[2025/12]** 🔄 **Rollout Routing Replay (R3)**: In collaboration with SGLang, we've launched R3 to solve MoE RL instability. R3 records inference routing decisions and replays them during training, effectively eliminating the "training-inference mismatch" and preventing training collapse in large MoE models like Qwen3 and DeepSeek-V3. [[Paper]](https://arxiv.org/pdf/2510.11370) [[Docs]](https://miles.radixark.com/docs/advanced/miles-router)
-*   **[2025/11]** 🔥 **Unified FP8 Release**: Solves the stability issues in MoE RL by ensuring training and inference use the exact same FP8 quantization logic. [[Blog]](https://lmsys.org/blog/2025-11-25-fp8-rl/)
-*   **[2025/11]** ⚡ **Speculative Decoding in RL**: Integrated speculative rollout with online SFT for draft models, achieving massive throughput gains. [[Blog]](https://github.com/zhaochenyang20/Awesome-ML-SYS-Tutorial/blob/main/rlhf/slime/spec/readme-en.md)
-*   **[2025/11]** 🎉 **Miles Project Launch**: A joint effort by InfiXAI, Ant Group, SGLang RL Team, and the Miles community. [[Announcement]](https://lmsys.org/blog/2025-11-19-miles/)
+## TL;DR
 
-## What is Miles?
+**Self-Retrospection Distillation (SRD)** is an implementation of *prospective
+learning*: it aligns the agent's **pre-interaction estimate** of what a task and
+environment will demand with the **summary of experience** gathered *after*
+interacting. As a lightweight auxiliary objective, SRD guides and reinforces RLVR
+and self-distillation training rather than replacing it. We find that it brings
+consistent gains over the base **GRPO / OPSD / RLSD** algorithms across tool-use,
+deep-search, and simple agentic tasks.
 
-**Miles** is a high-performance, enterprise-ready reinforcement learning (RL) framework specifically optimized for **Large-Scale model Post-Training**. Built as a powerful fork of **[slime](https://github.com/THUDM/slime)**, Miles bridges the gap between research-grade RL and production-grade reliability by integrating **SGLang** for high-throughput rollout and **Megatron-LM** for scalable training.
+## 🌟 Overview
 
-> *"A journey of a thousand miles begins with a single rollout."* — Miles focuses on the low-level system optimizations that make large-scale RL stable, efficient, and reproducible.
+<p align="center"><img src="assets/figs/overview.png" width="90%" alt="SRD overview"></p>
+<p align="center"><sub><b>Figure 1.</b> SRD pairs a pre-interaction <i>foresight</i> prediction with a <i>hindsight</i>-conditioned one and aligns them on the agent's own foresight rollout — turning post-hoc experience into prior foresight.</sub></p>
 
----
+<details>
+<summary><b>Contrast with prior experience-use paradigms</b></summary>
+<br/>
+<p align="center"><img src="assets/figs/contrast.png" width="90%" alt="SRD vs. prior experience-use paradigms"></p>
+<p align="center"><sub><b>Figure 2.</b> Retrospective RLVR / self-distillation condition the teacher on hindsight to sharpen the next action; SRD instead uses hindsight to supervise foresight, extracting signal even from reward-uniform groups.</sub></p>
+</details>
 
+## ✨ Key features
 
-## Key Features
+- **Prospective self-distillation.** A lightweight auxiliary objective that aligns
+  the agent's pre-interaction *foresight* with its post-interaction *hindsight*,
+  layered on top of RLVR / self-distillation.
+- **Model choices from 4B to 35B-A3B.** Qwen3.5-4B / 9B / 35B-A3B, one launcher.
+- **Diverse eval benchmarks.** Math (AIME, AMO-Bench), Code (LiveCodeBench,
+  OJBench), Search (HotpotQA, 2WikiMultiHopQA), and Agent (ALFWorld, WebShop).
+- **A sandbox per tool.** Each tool — code interpreter, search retriever, WebShop,
+  ALFWorld — runs in its own containerized sidecar, so they can be deployed
+  separately and on their own resources.
+- **Enroot launch, no local setup.** A one-click enroot start needs no local
+  environment; unlike Docker it shares the host network namespace with no daemon,
+  adapting cleanly across heterogeneous machines.
 
-### 🌪️ Advanced MoE & Low-Precision Training
+## 🛠 Environment & setup
 
-*   **Unified FP8 Pipeline**: The first framework to implement end-to-end FP8 sampling and training. By unifying precision across rollout and training, Miles eliminates the quantization-induced discrepancy that causes RL collapse in large MoE models.
-*   **Rollout Routing Replay (R3)**: Records expert routing decisions during SGLang inference and replays them during training to ensure bit-wise expert alignment.
-*   **INT4 QAT Support**: Recommendation for 1TB+ models to enable single-machine (e.g., H200) deployment by significantly reducing memory footprint.
+1. **Container image.** We use the `miles` CUDA-12 release image
+   (`radixark/miles:v0.1.0-cu12` — torch 2.11.0+cu129, with Megatron-LM + SGLang
+   baked in). Point the launcher at it with `IMAGE` / `SQSH` (the launcher imports
+   it once into the enroot squashfs).
 
-### 🛡️ Eliminating Train-Inference Mismatch
+2. **Install enroot** on the host (one-off — the image is imported into an enroot
+   squashfs, so no Docker daemon runs inside the training container):
+   ```bash
+   arch=$(dpkg --print-architecture)
+   curl -fSsL -O https://github.com/NVIDIA/enroot/releases/download/v3.5.0/enroot_3.5.0-1_${arch}.deb
+   sudo apt install -y ./enroot_3.5.0-1_${arch}.deb
+   ```
 
-*   **Bit-wise Identical Training and Inference Log Probs**: System-level solution achieving deterministic forward/backward passes through kernel-level optimization (FlashAttention-3, DeepGEMM).
-*   **Algorithmic Correction (TIS/MIS)**: When mismatch is unavoidable, Miles provides **Truncated Importance Sampling (TIS)** and **Masked Importance Sampling (MIS)** to mitigate off-policy bias and prevent training divergence.
+3. **Secrets** — create `examples/SRD/.env` (gitignored, never committed):
+   ```bash
+   WANDB_API_KEY=...          # wandb.ai → User Settings → API keys (wandb.ai/authorize)
+   HF_TOKEN=...               # huggingface.co → Settings → Access Tokens
+   # optional LLM-as-judge (used only as a search-domain grading fallback):
+   OPENAI_API_URL=...         # base URL of your OpenAI-compatible gateway (e.g. https://api.openai.com/v1)
+   LLM_GATEWAY_KEY=...        # API key for OPENAI_API_URL (your OpenAI key if that is the endpoint)
+   SDPO_REACT_JUDGE_MODEL=gpt-5.6-luna  # judge model name served by that gateway
+   ```
 
-### ⚡ Extreme Performance & Efficiency
+4. **Scratch root** for models / data / checkpoints, on a big disk:
+   ```bash
+   export SDPO_REACT_LOCAL_ROOT=/path/on/a/big/disk
+   ```
 
-*   **Speculative RL Training**: Achieve **25%+ rollout speedup** by using an **Online SFT Draft Model**. Unlike frozen draft models, Miles updates the draft policy during RL to prevent policy drift.
-*   **Zero-Copy Weight Sync**: Optimized weight refit via **CUDA IPC zero-copy mapping**, async tensor gathering, and bucketed flattening. Sync time reduced by 50% compared to standard HTTP/RPC transfers.
-*   **Partial Rollout & Over-Sampling**: Handles the "Long-Tail Effect" in multi-turn RL by over-sampling requests and recycling half-finished trajectories to maximize GPU utilization.
+5. **Data.** Training/eval sets are built from public upstreams on first run by the
+   run scripts' `[ -f … ] || build_*` guards (DAPO-Math-17k, LiveCodeBench,
+   FlashRAG, ALFWorld, WebShop, …). The only data committed to this repo is the
+   pass@k-filtered search eval (`examples/SRD/data/search_eval/`, 200 prompts),
+   which is not reproducible from the builders.
 
-## Model Support & Training Diversity
+A full, ordered fresh-host bring-up (host prerequisites, sidecars, image build) is
+in [`docs/bkp/README-bringup.md`](docs/bkp/README-bringup.md).
 
-### 🏗️ Supported Models
-Miles supports a wide range of state-of-the-art architectures, with a special emphasis on **DeepSeek, Qwen, Llama** and mainstream models.
+## ⚡ Quick start
 
-| Family | Supported Models |
-| :--- | :--- |
-| **DeepSeek** | **R1, V3, V3.2** |
-| **Qwen** | **Qwen 2, 2.5, 3** |
-| **Llama** | **Llama 3, 3.1, 3.3, 4** |
-| **Gemma** | **Gemma 2, 3, 3N** |
-| **GLM** | **GLM-4.5, GLM-4.6, GLM-4.7** |
-| **MiniMax** | **M2, M2.1** |
-| **Others** | **Mistral, Mixtral, Phi, gpt-oss and any model supported by SGLang and Megatron** |
+### Hardware & versions
 
-### 🧩 Diverse Training Scenarios
-Miles is designed to handle the complexity of modern RL workloads across various dimensions:
-*   **Multi-Turn Interaction**: Optimized for complex, multi-round conversations and tool-use scenarios.
-*   **VLM & LLM Support**: Unified framework for both Vision-Language and pure Text models.
-*   **Reasoning & Coding**: Specific recipes and optimizations for **Reasoning (Math/Logic)** and **Coding Agent** tasks.
-*   **Multi-Agent Training**: Support for advanced co-training and collaborative multi-agent reinforcement learning.
+| | |
+|---|---|
+| **GPUs** | 1 node × **8× H200 (141 GB)** recommended. Each run uses all 8 GPUs, so runs are launched sequentially on one node. On **8× H100** or **8× A100-80GB** (less VRAM) lower `SDPO_ABLATION_MAX_TOKENS_PER_GPU` accordingly. |
+| **CUDA** | 12.9 (cu12 image) or 13; NVIDIA driver 570+ for the cu12 build |
+| **PyTorch** | 2.11.0+cu129 (SM90+ / Hopper required for the FlashQLA Qwen GDN attention backend) |
+| **Stack** | Megatron-LM + SGLang + Ray, launched via enroot |
 
----
+### Run
 
-## Quick Start
+> **One-click for coding agents.** Point Claude Code, Codex, or any coding agent at
+> **[`assets/quickstart/SKILL.md`](assets/quickstart/SKILL.md)** — a self-contained,
+> step-by-step skill that checks preconditions, writes `.env`, and launches a run
+> end-to-end (e.g. *“follow assets/quickstart/SKILL.md to launch GRPO+SRD on 4B”*).
 
-### Installation
-
-We recommend using our official Docker image for the best performance and compatibility:
+All run scripts live in `examples/SRD/ablation/`
+(`run-qwen3.5-{4B,9B,35B-A3B}-sdpo-react-ablation-{mathcodesearch,alfworld-webshop}.sh`)
+and are driven by one launcher, `examples/SRD/enroot-run-sdpo-react.sh`, selected by
+two switches (model × domain) and two ablation axes (algorithm × arm):
 
 ```bash
-# Pull the latest image
-docker pull radixark/miles:latest
+export SDPO_REACT_LOCAL_ROOT=/path/on/a/big/disk
 
-# Or install from source
-pip install -r requirements.txt
-pip install -e .
+# GRPO + SRD, Qwen3.5-4B, math + code + search
+SDPO_REACT_MODEL=qwen3.5-4B SDPO_REACT_RUN_FAMILY=native \
+SDPO_ABLATION_ALGO=grpo  SDPO_ABLATION_ARM=e \
+  bash examples/SRD/enroot-run-sdpo-react.sh
+
+# OPSD + SRD, Qwen3.5-4B, agentic (ALFWorld + WebShop)
+SDPO_REACT_MODEL=qwen3.5-4B SDPO_REACT_RUN_FAMILY=agentic \
+SDPO_ABLATION_ALGO=sdpo  SDPO_ABLATION_ARM=e \
+  bash examples/SRD/enroot-run-sdpo-react.sh
 ```
 
-### Launch Training
+**SRD is arm `e`** (`grpo e` = GRPO+SRD, `sdpo e` = OPSD+SRD; the launcher value for
+OPSD is `sdpo`). Arm `a` is the no-skill control. Swap `qwen3.5-4B` →
+`qwen3.5-9B` / `qwen3.5-35B-A3B` for the other scales. The launcher starts the
+required sidecars (code sandbox, search retriever, or WebShop/ALFWorld)
+automatically. For the **full ablation matrix** — all arms × algorithms, the exact
+flags each produces, shared hyperparameters, and every environment override — and
+for running the scripts directly, see
+[`docs/srd/ablations.md`](docs/srd/ablations.md).
 
-Miles provides a unified entry point for complex RL tasks. Here is an example of FP8 GRPO training for Qwen3:
+### Where things land
 
-```bash
-python train.py \
-    --advantage-estimator grpo \
-    --model-name qwen3-30b-a3b \
-    --hf-checkpoint /path/to/qwen3-30b-a3b-hf \
-    --rollout-batch-size 512 \
-    --n-samples-per-prompt 8
+With `DATA_DIR = $SDPO_REACT_LOCAL_ROOT/data/$USER` (mounted as `/root/data`):
+
+- **Rollout / eval dumps** → `$DATA_DIR/sdpo_dumps/<exp>/`
+- **Per-trajectory traces** (messages, tool calls, grading) → `<dump>/agentic_traces/{rollout_id}.jsonl`
+- **Checkpoints** → `$DATA_DIR/sdpo_ckpts/` (only when `SDPO_REACT_SAVE_CKPT=1`)
+- **wandb** → group `sdpo-react-ablation-<config-tag>`
+
+## 📊 Evaluation
+
+Held-out benchmarks are evaluated during training (`--eval-interval 10`, avg@8).
+Pick the suite with `SDPO_REACT_EVAL_CONFIG`:
+
+- `eval_multitask_min.yaml` *(default)* — AIME-2026 + LiveCodeBench-v6-functional + HotpotQA (193 prompts)
+- `eval_multitask_full.yaml` — adds AIME-2024/2025, AMO-Bench, OJBench, 2WikiMultiHopQA
+
+Three standalone harnesses (`examples/SRD/ablation/eval-{amo-bench,lcb-functional,ojbench}.sh`)
+report final numbers on a saved checkpoint. For **BrowseComp-Plus** evaluation of
+the deep-search agent, please kindly refer to previous work
+[i-DeepSearch/observation-masking](https://github.com/i-DeepSearch/observation-masking).
+
+## 📂 Repository layout
+
+```
+examples/SRD/
+├── sdpo.py / reward.py / sdpo_react.py   # method, graders, multi-turn group RM
+├── prompt/                               # system / skill / judge prompt text
+├── tools/                                # code · cli · search · webshop · alfworld sidecars
+├── data/                                 # dataset builders + eval configs (+ in-repo search eval)
+├── ablation/                             # run scripts (model × domain) + held-out eval harnesses
+└── enroot-run-sdpo-react.sh              # one-click launcher
+docs/srd/                                 # ablation arms + hyperparameter reference
+docs/bkp/                                 # detailed bring-up notes + upstream framework README
 ```
 
-For comprehensive guides on environment setup and custom reward functions, see the [Quick Start Guide](https://miles.radixark.com/docs/getting-started/quick-start).
+## 🔬 Analysis & Findings
 
----
+<details>
+<summary><b>Main results</b></summary>
+<br/>
+<p align="center"><img src="assets/figs/table-main.png" width="95%" alt="Main results"></p>
+<p align="center"><sub><b>Table 1.</b> Main results on Math, Code, Search, and Agentic benchmarks (avg@8 pass rate, %). Each <b>+SRD</b> row adds SRD — distilling the pitfall hindsight — on top of its base algorithm (GRPO / OPSD / RLSD); the <i>Improved Perf.</i> rows report the absolute gain.</sub></p>
+</details>
 
-## Roadmap
+<details>
+<summary><b>Sample efficiency</b></summary>
+<br/>
+<p align="center"><img src="assets/figs/sample_efficiency.png" width="45%" alt="Sample efficiency"></p>
+<p align="center"><sub><b>Sample efficiency.</b> Across scales, 37–98% of rollout groups are reward-uniform, so group-relative RLVR extracts no gradient from them. SRD keeps learning from exactly these discarded groups — e.g. in the 2B all-failure regime (98% uniform) GRPO ends at 0.0% while <b>+SRD reaches 60.6%</b> under the same rollout budget.</sub></p>
+</details>
 
-### ✅ Completed
-
-- [x] **Unified FP8** E2E Training & Rollout
-- [x] **INT4 Quantization-Aware Training (QAT)**: Single-machine 1TB models
-- [x] **Speculative RL** with Online SFT
-- [x] **Multi-Agent RL** (Co-evolutionary frameworks like [MrlX](https://github.com/AQ-MedAI/MrlX))
-- [x] **Support DeepSeek V3.2 Models**
-- [x] **VLM Multi-Turn Training**
-- [x] **Aligning SGLang with Megatron in Dense Models**
-- [x] **Rollout Routing Replay (R3)**
-
-### 🏗️ In Progress & Planned
-
-- [ ] **Zero mismatch for MoE RL**
-- [ ] **Aligning SGLang with Megatron in MoE Models**
-- [ ] **Diffusion RL** Support
-- [ ] **Omni RL** Support
-- [ ] **Diffusion LLM RL** Support
-- [ ] **Elastic Resource Scheduling**: Dynamic scaling of rollout vs. training workers
-
-
-
----
+<details>
+<summary><b>SRD displacement</b></summary>
+<br/>
+<p align="center"><img src="assets/figs/srd_displacement.png" width="80%" alt="SRD displacement"></p>
+<p align="center"><sub><b>SRD displacement.</b> <i>L</i><sub>SRD</sub> is a dense per-token divergence toward a prospection target derived from the policy itself. Against a host that provides no dense signal (GRPO) it is the <i>only</i> such signal and <b>adds movement</b>; against a host that is already a dense self-distillation (OPSD) it is a second self-referential target competing for the same capacity and behaves like an <b>anchor</b> — the run travels less far along the direction it was already going. The plot decomposes the GRPO+SRD update onto GRPO's own direction (blue = kept, red = orthogonal remainder; dashed = unity).</sub></p>
+</details>
 
 ## Acknowledgements
 
-Miles is built upon the shoulders of giants in the LLM infrastructure ecosystem:
-*   **[slime](https://github.com/THUDM/slime)**: The core modular architecture and inspiration.
-*   **[SGLang](https://github.com/sgl-project/sglang)**: The high-performance inference engine.
-*   **[Megatron-LM](https://github.com/NVIDIA/Megatron-LM)**: Robust large-scale training components.
+<p align="center">
+  <a href="https://www.salesforceairesearch.com/"><img src="assets/logos/salesforce.svg" height="38" alt="Salesforce AI Research" align="middle"></a>&nbsp;&nbsp;&nbsp;
+  <a href="https://ucsd.edu/"><img src="assets/logos/ucsd.svg" height="34" alt="UC San Diego" align="middle"></a>&nbsp;&nbsp;&nbsp;
+  <a href="https://www.tamu.edu/"><img src="assets/logos/tamu.svg" height="40" alt="Texas A&amp;M University" align="middle"></a>&nbsp;&nbsp;&nbsp;
+  <a href="https://www.stanford.edu/"><img src="assets/logos/stanford_logo.png" height="40" alt="Stanford University" align="middle"></a>
+</p>
 
-Special thanks to **InfiXAI Team**, **Ant Group AQ Team**, **SGLang RL Team**, and the **Miles Team**. We also thank **DataCrunch** for compute sponsorship and **NVIDIA** for technical support on Transformer Engine (TE).
+We also thank the following open-source projects:
+- <img src="https://github.com/sgl-project.png?size=40" height="18" align="absmiddle"> **[SGLang](https://github.com/sgl-project/sglang)**, <img src="https://github.com/NVIDIA.png?size=40" height="18" align="absmiddle"> **[Megatron-LM](https://github.com/NVIDIA/Megatron-LM)**, and <img src="assets/logos/radixark.png" height="18" align="absmiddle">[**miles**](https://github.com/radixark/miles) for the seamless adaptation and the effort behind the foundational training and inference infrastructure.
+- <img src="https://github.com/i-DeepSearch.png?size=40" height="18" align="absmiddle"> *[When observation be essential](https://github.com/i-DeepSearch/observation-masking)* and <img src="assets/logos/openresearcher.png" height="18" align="absmiddle"> **[OpenResearcher](https://github.com/TIGER-AI-Lab/OpenResearcher)** for the early-stage exploration and construction of the deep-research and OpenResearcher components.
+- <img src="https://github.com/deepseek-ai.png?size=40" height="18" align="absmiddle"> **[DeepSeek-AI](https://huggingface.co/deepseek-ai)**, <img src="https://github.com/QwenLM.png?size=40" height="18" align="absmiddle"> **[Qwen-AI](https://huggingface.co/Qwen)**, <img src="https://github.com/siyan-zhao.png?size=40" height="18" align="absmiddle"> **[OPSD](https://github.com/siyan-zhao/OPSD)**, and <img src="https://github.com/lasgroup.png?size=40" height="18" align="absmiddle"> **[LASGroup](https://github.com/lasgroup/SDPO)** for the early-stage exploration on the algorithmic side.
 
----
 
-## Links
+## 📚 Citation
 
-*   **GitHub**: [https://github.com/radixark/miles](https://github.com/radixark/miles)
-*   **Slime Project**: [https://github.com/THUDM/slime](https://github.com/THUDM/slime)
-*   **Developer Guide**: Check the `docs/` and `examples/` directories for in-depth technical notes.
+```bibtex
+@inproceedings{srd2027,
+  title     = {Self-Retrospection Distillation: Turning Post-hoc Experiences into Prior Foresight},
+  author    = {Zhang, Haoxiang and Chen, Qinglin and Hayashi, Hiroaki and Li, Zhuofeng and Zhang, Siming and Zhang, Jiaxin and Chen, Jixuan and Wu, Fang and Lu, Pan and Savarese, Silvio and McAuley, Julian and Wu, Chien-Sheng},
+  year      = {2027}
+}
+```
 
-<div align="center">
-
-**Give Miles a ⭐️ Star if it helps your RL journey!**
-
-</div>
+Feel free to connect: `haz140@ucsd.edu` · `zhuofengli12345@gmail.com` · `hiroakihayashi@salesforce.com` · `wu.jason@salesforce.com`

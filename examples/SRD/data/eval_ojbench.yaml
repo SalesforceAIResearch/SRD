@@ -1,0 +1,16 @@
+# --eval-config for OJBench (competition-level Python code, NOI + ICPC).
+# Grading: code domain -> sandbox stdin/stdout judge (same as LiveCodeBench).
+# Built by: python -m examples.SRD.data.build_ojbench --out-dir /root/data/ojbench
+eval:
+  defaults:
+    max_response_len: 16384
+    top_p: 1.0
+    tool_key: tools
+    metadata_key: metadata
+  datasets:
+    - name: ojbench
+      path: ${oc.env:OJBENCH_DATA_DIR,/root/data/ojbench}/ojbench_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}

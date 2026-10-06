@@ -40,6 +40,22 @@ def add_sglang_arguments(parser):
     """
     parser = add_sglang_router_arguments(parser)
     parser.add_argument("--sglang-server-concurrency", type=int, default=512)
+    parser.add_argument(
+        "--sglang-flush-cache-timeout",
+        type=int,
+        default=60,
+        help=(
+            "Seconds to poll GET /flush_cache before giving up (SGLangEngine.flush_cache, "
+            "1 attempt/sec). /flush_cache returns non-200 while the server still has requests "
+            "in flight, so this is really 'how long to wait for in-flight generation to drain "
+            "before offload'. The default (60s) can be too short for domains with very long "
+            "individual episodes (e.g. tau2-bench conversations that can exceed 100K tokens) -- "
+            "confirmed live: a still-decoding 125K-token session caused release_memory_occupation "
+            "to raise TimeoutError at the default value. Raise this for such domains rather than "
+            "lowering --sglang-mem-fraction-static or --max-tokens-per-gpu, which don't address "
+            "the actual cause (a single slow generation, not memory pressure)."
+        ),
+    )
 
     old_add_argument = parser.add_argument
 
@@ -136,6 +152,20 @@ def add_sglang_arguments(parser):
 
 def validate_args(args):
     args.sglang_tp_size = args.rollout_num_gpus_per_engine
+
+    # Compat: miles code reads short parallel-size names (sglang_dp_size,
+    # sglang_pp_size, sglang_ep_size), but older sglang builds register these
+    # under the full flag names (--data-parallel-size etc. -> dest
+    # data_parallel_size), so the auto-prefixed attrs are
+    # args.sglang_{data,pipeline,expert}_parallel_size and the short names are
+    # absent. Bridge them so the rest of the codebase works on either build.
+    for short, full in (
+        ("sglang_dp_size", "sglang_data_parallel_size"),
+        ("sglang_pp_size", "sglang_pipeline_parallel_size"),
+        ("sglang_ep_size", "sglang_expert_parallel_size"),
+    ):
+        if not hasattr(args, short):
+            setattr(args, short, getattr(args, full, 1))
 
     if args.true_on_policy_mode:
         args.sglang_enable_deterministic_inference = True

@@ -45,6 +45,12 @@ class GenerateState:
 
         self.generate_function = load_generate_function(args.custom_generate_function_path) or generate
 
+        # Current train step, stamped by generate_rollout_async each step; None
+        # during eval. Generate functions may copy it onto sample.metadata for
+        # per-step dump splitting. Initialized here so eval (which never sets it)
+        # can still read it without AttributeError.
+        self.rollout_id: int | None = None
+
         self.reset()
 
     def reset(self) -> None:
@@ -104,14 +110,14 @@ async def generate_and_rm(
 
         # for multi agent system, the reward of some sample is calculated during generation.
         samples_need_reward = [sample for sample in samples if sample.reward is None]
-        await batched_async_rm(args, samples_need_reward, inplace_set_reward_field=True)
+        await batched_async_rm(args, samples_need_reward, inplace_set_reward_field=True, evaluation=evaluation)
         return samples
     else:
         if sample.status == Sample.Status.ABORTED:
             return sample
         # for multi-turn environment, a reward could be assigned to the agent.
         if sample.reward is None:
-            sample.reward = await async_rm(args, sample)
+            sample.reward = await async_rm(args, sample, evaluation=evaluation)
 
     logger.debug(f"{log_prefix} generate_and_rm complete")
     return sample
@@ -192,7 +198,11 @@ class InferenceRolloutFn:
     async def _call_eval(self, input: RolloutFnEvalInput) -> RolloutFnEvalOutput:
         from miles.rollout.inference_rollout.inference_rollout_eval import eval_rollout_single_dataset
 
-        assert not self.state.args.group_rm, "Group RM is not supported for eval rollout"
+        # See eval_rollout_single_dataset's matching assert for why
+        # --eval-custom-rm-path lifts this restriction.
+        assert (
+            not self.state.args.group_rm or self.state.args.eval_custom_rm_path is not None
+        ), "Group RM is not supported for eval rollout; set --eval-custom-rm-path to grade eval samples per-sample."
 
         coros = []
         for dataset_cfg in getattr(self.state.args, "eval_datasets", []) or []:

@@ -53,12 +53,32 @@ def _to_local_gpu_id(physical_gpu_id: int) -> int:
     )
 
 
-def launch_server_process(server_args: ServerArgs) -> multiprocessing.Process:
+def _launch_server_with_custom_models(server_args: ServerArgs) -> None:
+    """Subprocess entrypoint: register miles' custom SGLang model archs (arches
+    the shipped registry lacks), then hand off to the real launch_server. Runs in
+    the spawned child so the registration lands in that process before model load."""
+    try:
+        from sglang.srt.models.registry import ModelRegistry
+        from sglang.srt.models.olmo2 import Olmo2ForCausalLM
+
+        # Olmo3 (allenai/Olmo-3-7B-Instruct) is architecturally Olmo2 + features
+        # (sliding-window attention, yarn rope) that sglang's olmo2 impl already
+        # supports; sglang just doesn't register the Olmo3ForCausalLM arch name.
+        ModelRegistry.models.setdefault("Olmo3ForCausalLM", Olmo2ForCausalLM)
+    except Exception as e:  # never block startup for models that don't need this
+        import logging
+
+        logging.getLogger(__name__).warning(f"custom sglang model registration skipped: {e!r}")
+
     from sglang.srt.entrypoints.http_server import launch_server
 
+    launch_server(server_args)
+
+
+def launch_server_process(server_args: ServerArgs) -> multiprocessing.Process:
     multiprocessing.set_start_method("spawn", force=True)
     server_args.host = server_args.host.strip("[]")
-    p = multiprocessing.Process(target=launch_server, args=(server_args,))
+    p = multiprocessing.Process(target=_launch_server_with_custom_models, args=(server_args,))
     p.start()
 
     if server_args.node_rank != 0:
@@ -399,7 +419,8 @@ class SGLangEngine(RayActor):
         if self.node_rank != 0:
             return
         # flush cache will not return status_code 200 when there are pending requests
-        for _ in range(60):
+        timeout = getattr(self.args, "sglang_flush_cache_timeout", 60)
+        for _ in range(timeout):
             try:
                 response = requests.get(f"http://{self.server_host}:{self.server_port}/flush_cache")
                 if response.status_code == 200:
@@ -572,7 +593,20 @@ class SGLangEngine(RayActor):
         return response
 
     def continue_generation(self):
-        response = requests.post(f"http://{self.server_host}:{self.server_port}/continue_generation", json={})
+        # torch_empty_cache=False: SGLang's continue_generation handler
+        # (scheduler.py) calls torch.cuda.empty_cache() BEFORE clearing
+        # _engine_paused, not after -- the opposite order of pause_generation
+        # (which sets _engine_paused=True first). Under colocate, that
+        # empty_cache() contends with torch_memory_saver's cudaMalloc/cudaFree
+        # flock and can stall indefinitely, permanently stranding every
+        # rollout engine in the paused state (busy-spinning on
+        # `if self._engine_paused: continue`) with the resume HTTP call
+        # already having returned 200 OK. Requesting torch_empty_cache=False
+        # skips that call entirely, avoiding the stall.
+        response = requests.post(
+            f"http://{self.server_host}:{self.server_port}/continue_generation",
+            json={"torch_empty_cache": False},
+        )
         response.raise_for_status()
         return response
 
