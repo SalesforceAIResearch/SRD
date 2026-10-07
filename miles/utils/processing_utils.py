@@ -151,8 +151,32 @@ def load_processor(name_or_path: str, **kwargs):
     return proc
 
 
+def _prompt_has_vision(prompt) -> bool:
+    """True only if the prompt is a message list carrying image/video content.
+    qwen_vl_utils.extract_vision_info assumes a conversation of dict messages
+    with typed content parts; a plain string prompt (or a message whose content
+    is a bare string) has no vision and must NOT be fed to it -- doing so raises
+    'TypeError: string indices must be integers'. Text-only runs on a MULTIMODAL
+    model (e.g. Qwen3.5-4B) load a processor but send string prompts, so guard."""
+    if not isinstance(prompt, list):
+        return False
+    for msg in prompt:
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") in ("image", "image_url", "video"):
+                    return True
+    return False
+
+
 def process_vision_info(prompt, processor):
     # TODO: temporary solution, will write image utils for miles later
+    # Text-only prompt on a multimodal model -> no vision to extract. Return
+    # empty (skip qwen_vl_utils, which crashes on non-conversation/string input).
+    if not _prompt_has_vision(prompt):
+        return {"images": None, "videos": None}
     from qwen_vl_utils import process_vision_info as qwen_process_vision_info
 
     if hasattr(processor.image_processor, "patch_size"):

@@ -22,7 +22,7 @@ def maybe_dump_policy_loss_debug(
     pg_loss: torch.Tensor,
 ) -> None:
     dump_dir = getattr(args, "dump_details", None)
-    if dump_dir is None:
+    if dump_dir is None or not getattr(args, "dump_policy_loss_debug", True):
         return
 
     global _POLICY_LOSS_DUMP_COUNTER

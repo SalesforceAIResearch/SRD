@@ -1,0 +1,45 @@
+[
+  {
+    "session_id": "fdbfd374-a0a2-4824-9602-681c307f75f5",
+    "url": "http://127.0.0.1:8421/session/fdbfd374-a0a2-4824-9602-681c307f75f5/call",
+    "request": {
+      "tool": "search",
+      "args": {
+        "query": "who wrote hamlet",
+        "topn": 3
+      }
+    },
+    "status_code": 200,
+    "response": {
+      "observation": "[0] who wrote hamlet (web-search://ts=1785713648315457474)\n**viewing lines [0 - 27] of 27**\n\nL0: \nL1: URL: web-search://ts=1785713648315457474\nL2: # Search Results\nL3: \nL4:   * 【0†wiki18://cbe6166488de/0†wiki18:】 Title: Harue Tsutsumi. Tsutsumi wrote \nL5: her first play The Strange Tales of the Rokumeikan (Rokumeikan Ibun). In 1992 \nL6: she wrote \"\"Kanadehon Hamlet\"\" (Kanadehon Hamuretto) and won the Yomiuri Award \nL7: in the drama category. \"\"Kanadehon Hamlet\"\" takes place in the nineteenth-\nL8: century and is about a troupe of kabuki actors who are having difficulties \nL9: trying to perform \"\"Hamlet\"\", written by William Shakespeare, on stage since all\nL10:  they know how to perform is kabuki. \"\"Kanadehon Hamlet\"\" takes \"\"Hamlet\"\", a \nL11: tragedy, and \"\"Kanade\nL12:   * 【1†wiki18://cbe6166488de/1†wiki18:】 Title: Hamlet (Liszt). are made to \nL13: Ophelia, both marked as \"\"to be played as quietly as possible and sound like a \nL14: shadowy picture.\"\" Hamlet (Liszt) Hamlet, S.104, is a symphonic poem by Franz \nL15: Liszt, written in 1858 and published as No. 10. It was not performed until 2 \nL16: July 1876. Like all but one of Liszt's 13 symphonic poems, \"\"Hamlet\"\" was \nL17: written while Liszt was working in Weimar and is dedicated to Carolyne zu Sayn-\nL18: Wittgenstein. After viewing Bogumil Dawison play Hamlet in Weimar (1856), Liszt \nL19: wrote: \"\"He does not \nL20:   * 【2†wiki18://cbe6166488de/2†wiki18:】 Title: Hamlet (Liszt). Hamlet (Liszt) \nL21: Hamlet, S.104, is a symphonic poem by Franz Liszt, written in 1858 and published\nL22:  as No. 10. It was not performed until 2 July 1876. Like all but one of Liszt's \nL23: 13 symphonic poems, \"\"Hamlet\"\" was written while Liszt was working in Weimar and\nL24:  is dedicated to Carolyne zu Sayn-Wittgenstein. After viewing Bogumil Dawison \nL25: play Hamlet in Weimar (1856), Liszt wrote: \"\"He does not make him into an \nL26: indecisive dreamer who collapses under the power of his mission, as he is \nL27: regarded since Goet"
+    }
+  },
+  {
+    "session_id": "fdbfd374-a0a2-4824-9602-681c307f75f5",
+    "url": "http://127.0.0.1:8421/session/fdbfd374-a0a2-4824-9602-681c307f75f5/call",
+    "request": {
+      "tool": "open",
+      "args": {
+        "id": 0
+      }
+    },
+    "status_code": 200,
+    "response": {
+      "observation": "[1] Harue Tsutsumi (wiki18://cbe6166488de/0)\n**viewing lines [0 - 10] of 10**\n\nL0: \nL1: URL: wiki18://cbe6166488de/0\nL2: Tsutsumi wrote her first play The Strange Tales of the Rokumeikan (Rokumeikan \nL3: Ibun). In 1992 she wrote \"\"Kanadehon Hamlet\"\" (Kanadehon Hamuretto) and won the \nL4: Yomiuri Award in the drama category. \"\"Kanadehon Hamlet\"\" takes place in the \nL5: nineteenth-century and is about a troupe of kabuki actors who are having \nL6: difficulties trying to perform \"\"Hamlet\"\", written by William Shakespeare, on \nL7: stage since all they know how to perform is kabuki. \"\"Kanadehon Hamlet\"\" takes \nL8: \"\"Hamlet\"\", a tragedy, and \"\"Kanadehon Chūshingura\"\", a melodrama, and brings \nL9: them together in a world where the two plays could be performed together by the \nL10: same set of actors."
+    }
+  },
+  {
+    "session_id": "fdbfd374-a0a2-4824-9602-681c307f75f5",
+    "url": "http://127.0.0.1:8421/session/fdbfd374-a0a2-4824-9602-681c307f75f5/call",
+    "request": {
+      "tool": "find",
+      "args": {
+        "pattern": "the"
+      }
+    },
+    "status_code": 200,
+    "response": {
+      "observation": "[2] Find results for text: `the` in `Harue Tsutsumi` (wiki18://cbe6166488de/0/find?pattern=the)\n**viewing lines [0 - 10] of 10**\n\nL0: # 【0†match at L2】\nL1: Tsutsumi wrote her first play The Strange Tales of the Rokumeikan (Rokumeikan \nL2: Ibun). In 1992 she wrote \"\"Kanadehon Hamlet\"\" (Kanadehon Hamuretto) and won the \nL3: Yomiuri Award in the drama category. \"\"Kanadehon Hamlet\"\" takes place in the \nL4: nineteenth-century and is about a troupe of kabuki actors who are having \nL5: \nL6: # 【1†match at L7】\nL7: stage since all they know how to perform is kabuki. \"\"Kanadehon Hamlet\"\" takes \nL8: \"\"Hamlet\"\", a tragedy, and \"\"Kanadehon Chūshingura\"\", a melodrama, and brings \nL9: them together in a world where the two plays could be performed together by the \nL10: same set of actors."
+    }
+  }
+]

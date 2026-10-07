@@ -1,0 +1,11 @@
+# gpt-oss's base install already pulls in openai-harmony, lxml, html2text, chz,
+# aiohttp, fastapi, uvicorn, tenacity, requests -- everything browser.py needs
+# (copied verbatim from i-DeepSearch). The [all]/[torch]/[triton] extras
+# (local model inference) are NOT needed here: this sidecar only ROUTES
+# search/open/find calls to the existing retrieval index over HTTP, it never
+# runs a model itself.
+gpt-oss==0.0.9
+# retrieval_adapter.py's own client to the wiki-18 retriever (async, unlike
+# browser.py's synchronous `requests`, which it only uses on the SerperService
+# backend path this repo doesn't use).
+httpx==0.28.*

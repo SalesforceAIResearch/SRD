@@ -1,0 +1,54 @@
+# WebShop's OWN pins (github.com/princeton-nlp/WebShop), copied verbatim
+# rather than re-derived -- this repo's own env engine (web_agent_site/
+# engine/engine.py) hard-imports pyserini's LuceneSearcher to instantiate the
+# gym env at all (not just for the search[query] action), so pyserini is not
+# skippable even for pure text-env use. Requires Python<=3.10 (see
+# Dockerfile). Flask/selenium/gradio (WebShop's own web UI / baseline
+# training scripts) are dropped -- unused by gym.make() alone.
+beautifulsoup4==4.11.1
+cleantext==1.1.4
+# web_agent_site/engine/engine.py unconditionally imports flask at module
+# level (render_template_string, used by its own web UI) -- a hard import
+# even for pure gym.make() use, not skippable as originally assumed. Pin
+# Werkzeug to match (Flask 2.1.2 needs the pre-url_quote-removal API).
+Flask==2.1.2
+Werkzeug==2.1.2
+gdown
+gym==0.24.0
+numpy==1.22.4
+pandas==1.4.2
+# pyserini's encode module hard-imports faiss even for pure sparse/BM25-style
+# LuceneSearcher use (its own dense-encoder path, unused here) -- pyserini
+# doesn't work at all without it importable.
+faiss-cpu
+pyserini==0.17.0
+PyYAML==6.0
+rank_bm25==0.2.2
+requests==2.27.1
+rich==12.4.4
+scikit_learn==1.1.1
+# web_agent_site/envs/__init__.py unconditionally imports BOTH its envs
+# (WebAgentSiteEnv, the selenium-driven full-browser simulator we don't use,
+# and WebAgentTextEnv, the one we do) to register them with gym -- selenium
+# is a hard import just to reach the text env's registration.
+selenium==4.2.0
+spacy==3.3.0
+thefuzz==0.19.0
+# torch==1.11.0 (WebShop's own pin) fails to even import on this host/kernel
+# ("libtorch_cpu.so: cannot enable executable stack") -- a binary-compat issue
+# with that old build, unrelated to anything this sidecar actually needs
+# torch FOR (pyserini's unused dense-encoder import path + transformers'
+# tokenizer backend). A modern CPU-only torch avoids the broken .so.
+torch
+tqdm==4.64.0
+transformers==4.19.2
+# spacy==3.3.0 (above) pins pydantic!=1.8,!=1.8.1,<1.9.0,>=1.7.4 -- a much
+# older FastAPI generation that still supports pydantic<1.9 is needed (this
+# pin is local to this sidecar's own isolated container, unrelated to
+# training-image FastAPI usage).
+fastapi==0.68.*
+uvicorn[standard]==0.15.*
+pydantic==1.8.2
+# router.py's outgoing client to the worker processes -- no pydantic/fastapi
+# dependency of its own, so it doesn't fight the old pins above.
+httpx==0.23.*

@@ -4,6 +4,7 @@ Answer checker API that uses sympy to simplify expressions and check for equalit
 
 Call grade_answer(given_answer: str, ground_truth: str).
 """
+import math
 import re
 
 import sympy
@@ -161,8 +162,16 @@ def _strip_string(string):
 
 # sympy might hang -- we don't care about trying to be lenient in these cases
 BAD_SUBSTRINGS = ["^{", "^("]
-BAD_REGEXES = [r"\^[0-9]+\^", r"\^[0-9][0-9]+"]
+# A bare numeric/symbolic base with a large exponent (e.g. "10^33", "x^99999999")
+# is cheap to parse and simplify -- sympy just represents it as a single power term.
+# The actual hang risk is a COMPOUND base raised to a huge exponent (e.g.
+# "(x+1)^99999999"), which forces a real polynomial expansion. Only block that,
+# so scientific-notation ground truths like "4*10^33" (which our own _parse_latex
+# emits for "4 \times 10^{33}") still reach are_equal_under_sympy.
+BAD_REGEXES = [r"\^[0-9]+\^", r"\)\^[0-9][0-9]+"]
 TUPLE_CHARS = "()[]"
+# Detects an already-well-formed scientific-notation literal (e.g. "4e33", "-1.6e-10").
+_SCI_NOTATION_RE = re.compile(r"^-?\d+\.?\d*[eE][+-]?\d+$")
 
 
 def _sympy_parse(expr: str):
@@ -293,7 +302,12 @@ def _normalize(expr: str) -> str:
         expr = expr[1:-1]
 
     expr = re.sub(",\\\\! *", "", expr)
-    if _is_float(expr) and _is_int(float(expr)):
+    # Scientific notation already parses exactly under sympy (see grade_answer_sympy) --
+    # collapsing it through float()/int() first loses precision for large magnitudes
+    # (e.g. "4e33" -> a garbage 34-digit integer) and defeats that comparison entirely.
+    if _SCI_NOTATION_RE.match(expr.strip()):
+        pass
+    elif _is_float(expr) and _is_int(float(expr)):
         expr = str(int(round(float(expr))))
     if "\\" in expr:
         try:
@@ -355,6 +369,36 @@ def are_equal_under_sympy(ground_truth_normalized: str, given_normalized: str):
     except Exception:
         pass
     return are_equal
+
+
+def _numeric_equal_under_sympy(a: str, b: str, rel_tol: float = 1e-6) -> bool:
+    """Relative-tolerance numeric compare for two expressions sympy can evaluate to a
+    number (e.g. "4e33" vs "4*10^33"). Used only as a fallback when _str_is_int
+    disagrees between the two sides purely because of notation (scientific vs
+    polynomial form), not because one side is actually non-integer -- the exact
+    are_equal_under_sympy(simplified == 0) path already covers real equality when both
+    sides parse the same way."""
+    if not (should_allow_eval(a) and should_allow_eval(b)):
+        return False
+    try:
+        a_val = complex(sympy.N(_sympy_parse(a)))
+        b_val = complex(sympy.N(_sympy_parse(b)))
+    except Exception:
+        return False
+    if a_val.imag or b_val.imag:
+        return False
+    a_real, b_real = a_val.real, b_val.real
+    if math.isinf(a_real) or math.isinf(b_real) or math.isnan(a_real) or math.isnan(b_real):
+        # sympy.N()'s default precision overflows huge (but finite, distinct)
+        # magnitudes to the same inf -- e.g. 4**2012 and 2**2012 both evaluate
+        # to inf here even though the former is astronomically larger. Treat
+        # as unequal rather than let inf == inf slip through.
+        return False
+    if a_real == b_real:
+        return True
+    if a_real == 0 or b_real == 0:
+        return False
+    return abs(a_real - b_real) / max(abs(a_real), abs(b_real)) <= rel_tol
 
 
 def split_tuple(expr: str):
@@ -450,8 +494,14 @@ def grade_answer_sympy(given_answer: str, ground_truth: str) -> bool:
                 # so, we don't want to allow sympy.simplify in this case
                 is_correct = ground_truth_elem == given_elem
             elif _str_is_int(ground_truth_elem) != _str_is_int(given_elem):
-                # if the ground truth answer is an integer, we require the given answer to be a strict match (no sympy.simplify)
-                is_correct = False
+                # Usually a real type mismatch (int vs non-numeric), where we require a
+                # strict match (no sympy.simplify). But scientific notation like "4e33"
+                # trips _str_is_int's float()-based check to True while its polynomial
+                # form "4*10^33" (e.g. from _parse_latex on "4 \times 10^{33}") trips it
+                # to False -- both sides are actually the same integer, just spelled
+                # differently. Fall back to a numeric compare for exactly that case
+                # instead of a blanket reject.
+                is_correct = _numeric_equal_under_sympy(ground_truth_elem, given_elem)
             else:
                 is_correct = are_equal_under_sympy(ground_truth_elem, given_elem)
             if not is_correct:

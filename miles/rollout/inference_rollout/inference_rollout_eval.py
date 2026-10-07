@@ -12,7 +12,7 @@ from miles.rollout.inference_rollout.inference_rollout_common import (
 )
 from miles.utils.data import Dataset
 from miles.utils.eval_config import EvalDatasetConfig
-from miles.utils.misc import as_completed_async
+from miles.utils.misc import as_completed_async, load_function
 from miles.utils.processing_utils import load_processor, load_tokenizer
 from miles.utils.types import Sample
 
@@ -25,7 +25,19 @@ async def eval_rollout_single_dataset(
     prompt_dataset_cache: dict[Any, Dataset],
 ) -> dict[str, dict[str, list[Any]]]:
     args = state.args
-    assert not args.group_rm, "Group RM is not supported for eval rollout"
+    # Group RM defers scoring to a whole-group step that eval does not run, so
+    # eval samples would have no reward. --eval-custom-rm-path supplies a
+    # per-sample eval RM instead, which is what makes eval possible while
+    # training uses --group-rm. Mirrors miles/rollout/sglang_rollout.py's
+    # legacy eval_rollout_single_dataset -- this experimental-refactor path
+    # (used whenever MILES_EXPERIMENTAL_ROLLOUT_REFACTOR=1, required for
+    # --generate-tool-specs-path/etc's CLI registration) never had this ported
+    # over, so any --group-rm training run with --eval-interval set crashed
+    # at the first eval with "AssertionError: Group RM is not supported for
+    # eval rollout" -- a hard crash mid-training, not a warning.
+    assert (
+        not args.group_rm or args.eval_custom_rm_path is not None
+    ), "Group RM is not supported for eval rollout; set --eval-custom-rm-path to grade eval samples per-sample."
 
     cache_key = dataset_cfg.cache_key + (args.hf_checkpoint, args.apply_chat_template, args.chat_template_path)
     if cache_key not in prompt_dataset_cache:
@@ -45,6 +57,7 @@ async def eval_rollout_single_dataset(
             tool_key=dataset_cfg.tool_key,
             apply_chat_template=args.apply_chat_template,
             apply_chat_template_kwargs=args.apply_chat_template_kwargs,
+            tool_specs_resolver=load_function(args.tool_specs_resolver_path),
         )
     dataset = prompt_dataset_cache[cache_key]
 
@@ -103,6 +116,17 @@ async def eval_rollout_single_dataset(
     pbar.close()
 
     data.sort(key=lambda sample: sample.index)
+
+    # Under --group-rm, generate_and_rm defers scoring to a group step that
+    # eval does not run, so eval samples arrive with reward=None. Grade them
+    # here with the per-sample eval RM (the assert above guarantees it is set
+    # in that case).
+    if args.group_rm and args.eval_custom_rm_path is not None:
+        eval_rm = load_function(args.eval_custom_rm_path)
+        need_reward = [sample for sample in data if sample.reward is None]
+        rewards = await asyncio.gather(*(eval_rm(args, sample) for sample in need_reward))
+        for sample, reward in zip(need_reward, rewards, strict=True):
+            sample.reward = reward
 
     reward_key = args.eval_reward_key or args.reward_key
     return {

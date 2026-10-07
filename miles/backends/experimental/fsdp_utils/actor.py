@@ -436,7 +436,7 @@ class FSDPTrainRayActor(TrainRayActor):
         actor_results = self._compute_log_prob("actor", data_iterator, num_microbatches)
         rollout_data.update(actor_results)
 
-        compute_advantages_and_returns(self.args, rollout_data)
+        compute_advantages_and_returns(self.args, rollout_data, rollout_id=rollout_id)
 
         log_rollout_data(rollout_id, self.args, rollout_data)
 

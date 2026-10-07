@@ -77,6 +77,13 @@ async def generate_rollout_async(
     args = state.args
     assert args.rollout_global_dataset
 
+    # Expose the current train step to generate functions via the shared state
+    # (mirrors the legacy sglang_rollout.py path). multi_turn.generate copies
+    # this onto sample.metadata["rollout_id"] so per-step dumps (e.g. SDPO_ReAct's
+    # agentic_traces/{rollout_id}.jsonl) split by training step instead of piling
+    # every step into one huge unknown.jsonl.
+    state.rollout_id = rollout_id
+
     await dumper_utils.configure_sglang(args)
 
     # instantiate data filters
@@ -87,9 +94,25 @@ async def generate_rollout_async(
     # target_data_size is the total number of valid samples to get
     target_data_size = args.rollout_batch_size
 
+    # Domain-balanced acceptance (multi-task + dynamic sampling): give each domain
+    # a ~equal quota of filter-passing groups so a batch spans all domains evenly,
+    # even though dynamic sampling drops dead/no-prefix groups (which otherwise
+    # skew the mix toward whichever domain fails least). Deadlock-safe: once we've
+    # over-sampled well past the batch (fallback_threshold), quotas are dropped and
+    # remaining slots take any passing group, so a hard domain can't stall the batch.
+    n_domains_balance = int(getattr(args, "rollout_domain_balanced_n", 0) or 0)
+    domain_balanced = n_domains_balance > 0
+
+    def _group_domain(group) -> str:
+        s = group[0][0] if isinstance(group[0], list) else group[0]
+        md = getattr(s, "metadata", None)
+        return md.get("domain", "unknown") if isinstance(md, dict) else "unknown"
+
     pendings = set()
     data = []
     all_data = []
+    accepted_by_domain: dict[str, int] = {}
+    considered = 0  # filter-passing groups seen (for the fallback trigger)
     do_print = True
     pbar = tqdm(total=target_data_size * args.n_samples_per_prompt, desc="Rollout generation")
     while len(data) < target_data_size:
@@ -123,11 +146,27 @@ async def generate_rollout_async(
                 metric_gatherer.on_dynamic_filter_drop(reason=dynamic_filter_output.reason)
                 continue
 
+            if len(data) >= target_data_size:
+                continue
+
+            if domain_balanced:
+                considered += 1
+                dom = _group_domain(group)
+                # Per-domain quota = ceil(target / N) with N the configured domain
+                # count (stable, unlike counting domains as they appear). Enforce
+                # only until we've over-sampled ~2x the batch in passing groups;
+                # after that, fall back to first-come so a domain that can't fill
+                # its quota never stalls the batch (deadlock guard).
+                fallback = considered >= 2 * target_data_size
+                quota = -(-target_data_size // n_domains_balance)  # ceil div
+                if not fallback and accepted_by_domain.get(dom, 0) >= quota:
+                    continue  # this domain is full for now; wait for others
+                accepted_by_domain[dom] = accepted_by_domain.get(dom, 0) + 1
+
             # add the samples to the data
             # NOTE: here we have not stored all the unused samples back to the data buffer.
-            if len(data) < target_data_size:
-                data.append(group)
-                pbar.update(args.n_samples_per_prompt)
+            data.append(group)
+            pbar.update(args.n_samples_per_prompt)
 
     pbar.close()
     sample = data[-1][0][0] if isinstance(data[-1][0], list) else data[-1][0]

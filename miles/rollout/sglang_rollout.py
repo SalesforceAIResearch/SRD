@@ -113,6 +113,13 @@ class GenerateState(metaclass=SingletonMeta):
         self.remaining_batch_size = 0
         self.pendings = set()
         self.aborted = False
+        # The current train/eval rollout_id, stamped by generate_rollout_async
+        # / eval_rollout_single_dataset below so custom generate functions
+        # (via GenerateState(args), the same singleton) and custom group RMs
+        # can tag sample.metadata with the real step id instead of inventing
+        # their own private call counter -- see examples/SRD/
+        # generate_with_tools.py and sdpo_react.py for the consumer.
+        self.rollout_id: int | None = None
 
     def submit_generate_tasks(self, samples: list[list[Sample]]) -> None:
         for group in samples:
@@ -130,7 +137,9 @@ class GenerateState(metaclass=SingletonMeta):
         self.remaining_batch_size += len(samples)
 
 
-async def generate(args: Namespace, sample: Sample, sampling_params: dict[str, Any]) -> Sample:
+async def generate(
+    args: Namespace, sample: Sample, sampling_params: dict[str, Any], evaluation: bool = False
+) -> Sample:
     """Generate using traditional SGLang router with token-based workflow"""
     if args.ci_test:
         assert isinstance(sample.prompt, str)
@@ -167,9 +176,18 @@ async def generate(args: Namespace, sample: Sample, sampling_params: dict[str, A
         "sampling_params": sampling_params,
         "return_logprob": True,
     }
+    # Eval only measures pass@1 and never uses the OPD/SDPO distillation signal,
+    # so it must NOT request top-k logprobs — doing so wastes compute and OOMs the
+    # logits processor on long (e.g. 16k) eval sequences. Gate top-k on training.
     opd_top_k = getattr(args, "opd_log_prob_top_k", 0) or 0
     opd_top_k_strategy = getattr(args, "opd_top_k_strategy", "only-student")
-    if getattr(args, "use_opd", False) and opd_top_k > 0 and opd_top_k_strategy != "only-teacher":
+    want_top_k = (
+        not evaluation
+        and getattr(args, "use_opd", False)
+        and opd_top_k > 0
+        and opd_top_k_strategy != "only-teacher"
+    )
+    if want_top_k:
         payload["top_logprobs_num"] = opd_top_k
 
     if is_lora_enabled(args):
@@ -198,7 +216,7 @@ async def generate(args: Namespace, sample: Sample, sampling_params: dict[str, A
         headers = {"X-SMG-Routing-Key": sample.session_id}
 
     output = await post(url, payload, headers=headers)
-    if getattr(args, "use_opd", False) and opd_top_k > 0 and opd_top_k_strategy != "only-teacher":
+    if want_top_k:
         output_top_logprobs = output.get("meta_info", {}).get("output_top_logprobs")
         if output_top_logprobs is not None:
             sample.metadata.setdefault("opd_student_top_logprobs", [])
@@ -277,7 +295,7 @@ async def generate_and_rm(
                 )
                 sample = output.samples
             else:
-                sample = await generate(args, sample, sampling_params)
+                sample = await generate(args, sample, sampling_params, evaluation=evaluation)
 
     # for the rm that need the whole group, we will not do the rm here
     if args.group_rm:
@@ -291,7 +309,7 @@ async def generate_and_rm(
 
         # for multi agent system, the reward of some sample is calculated during generation.
         samples_need_reward = [sample for sample in samples if sample.reward is None]
-        rewards = await batched_async_rm(args, samples_need_reward)
+        rewards = await batched_async_rm(args, samples_need_reward, evaluation=evaluation)
         for sample, reward in zip(samples_need_reward, rewards, strict=False):
             sample.reward = reward
         return samples
@@ -300,7 +318,7 @@ async def generate_and_rm(
             return sample
         # for multi-turn environment, a reward could be assigned to the agent.
         if sample.reward is None:
-            sample.reward = await async_rm(args, sample)
+            sample.reward = await async_rm(args, sample, evaluation=evaluation)
 
     return sample
 
@@ -404,6 +422,7 @@ async def generate_rollout_async(
     await dumper_utils.configure_sglang(args)
 
     state = GenerateState(args)
+    state.rollout_id = rollout_id
 
     # instantiate data filters
     dynamic_filter = (
@@ -491,8 +510,14 @@ EVAL_PROMPT_DATASET = {}
 
 
 async def eval_rollout(args: Namespace, rollout_id: int) -> tuple[dict[str, dict[str, list[Any]]], list[list[Sample]]]:
-    assert not args.group_rm, "Group RM is not supported for eval rollout"
+    # Group RM defers scoring to a whole-group step that eval does not run, so eval
+    # samples would have no reward. --eval-custom-rm-path supplies a per-sample eval
+    # RM instead, which is what makes eval possible while training uses --group-rm.
+    assert (
+        not args.group_rm or args.eval_custom_rm_path is not None
+    ), "Group RM is not supported for eval rollout; set --eval-custom-rm-path to grade eval samples per-sample."
 
+    GenerateState(args).rollout_id = rollout_id
     coros = []
     for dataset_cfg in getattr(args, "eval_datasets", []) or []:
         coros.append(eval_rollout_single_dataset(args, rollout_id, dataset_cfg))
@@ -513,7 +538,9 @@ async def eval_rollout_single_dataset(
         rollout_id: int, the id of the rollout, used for deterministic data generation
         dataset_cfg: configuration of the dataset
     """
-    assert not args.group_rm, "Group RM is not supported for eval rollout"
+    assert (
+        not args.group_rm or args.eval_custom_rm_path is not None
+    ), "Group RM is not supported for eval rollout; set --eval-custom-rm-path to grade eval samples per-sample."
 
     global EVAL_PROMPT_DATASET
 
@@ -535,6 +562,7 @@ async def eval_rollout_single_dataset(
             tool_key=dataset_cfg.tool_key,
             apply_chat_template=args.apply_chat_template,
             apply_chat_template_kwargs=args.apply_chat_template_kwargs,
+            tool_specs_resolver=load_function(args.tool_specs_resolver_path),
         )
     dataset = EVAL_PROMPT_DATASET[cache_key]
 
@@ -597,6 +625,16 @@ async def eval_rollout_single_dataset(
     pbar.close()
 
     data.sort(key=lambda sample: sample.index)
+
+    # Under --group-rm, generate_and_rm defers scoring to a group step that eval
+    # does not run, so eval samples arrive with reward=None. Grade them here with
+    # the per-sample eval RM (the assert above guarantees it is set in that case).
+    if args.group_rm and args.eval_custom_rm_path is not None:
+        eval_rm = load_function(args.eval_custom_rm_path)
+        need_reward = [sample for sample in data if sample.reward is None]
+        rewards = await asyncio.gather(*(eval_rm(args, sample) for sample in need_reward))
+        for sample, reward in zip(need_reward, rewards, strict=True):
+            sample.reward = reward
 
     reward_key = args.eval_reward_key or args.reward_key
     return {

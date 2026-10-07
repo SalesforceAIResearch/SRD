@@ -111,6 +111,13 @@ async def generate(input: GenerateFnInput) -> GenerateFnOutput:
     )
     for s in samples:
         s.metadata.update(agent_metadata or {})
+        # The real train/eval step id, stamped on the GenerateState singleton by
+        # sglang_rollout.py's generate_rollout_async/eval_rollout -- mirrors
+        # generate_with_tools.py's own sample.metadata["rollout_id"] = state.rollout_id
+        # so downstream per-step trace dumps (e.g. SDPO_ReAct's
+        # agentic_traces/{rollout_id}.jsonl) can group tau2 samples by rollout
+        # step too, instead of falling back to a single shared "unknown.jsonl".
+        s.metadata["rollout_id"] = input.state.rollout_id
 
     if max_seq_len is not None:
         samples = truncate_samples_by_total_tokens(samples, max_seq_len, input.state.tokenizer)

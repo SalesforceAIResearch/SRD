@@ -66,6 +66,22 @@ class _TensorBackuperNormal(TensorBackuper):
             self._backups[dst_tag][name].copy_(self._backups[src_tag][name])
 
     @torch.no_grad()
+    def ema_update_from_source(self, tag: str, rate: float) -> None:
+        """EMA-blend a backup toward the CURRENT source weights (in place):
+        backup = (1 - rate) * backup + rate * source. Used for the SDPO EMA
+        teacher so it slowly tracks the live policy without instantly matching it."""
+        backup_dict = self._backups[tag]
+        for name, param in self._source_getter():
+            if name not in backup_dict:
+                # First-time init: start the EMA teacher at the current weights.
+                backup_dict[name] = torch.empty_like(param, device=torch.device("cpu"), pin_memory=True)
+                backup_dict[name].copy_(param.detach(), non_blocking=True)
+                continue
+            src_cpu = param.detach().to(backup_dict[name].device, non_blocking=True)
+            backup_dict[name].mul_(1.0 - rate).add_(src_cpu, alpha=rate)
+        torch.cuda.synchronize()
+
+    @torch.no_grad()
     def restore(self, tag: str) -> None:
         backup_dict = self._backups[tag]
         for name, param in self._source_getter():
@@ -100,6 +116,11 @@ class _TensorBackuperNoop(TensorBackuper):
         assert tag == self._single_tag
         assert _compute_hash_dict(dict(self._source_getter())) == self._backup_hash_dict
         torch.cuda.synchronize()
+
+    def ema_update_from_source(self, tag: str, rate: float) -> None:
+        # No separate weight store in noop mode; EMA teacher requires the normal
+        # backuper (enabled whenever with_ref/opd/keep_old_actor/colocate holds).
+        raise NotImplementedError("EMA teacher requires the normal TensorBackuper (weight backup enabled).")
 
 
 def _compute_hash_dict(tensors: dict[str, torch.Tensor]):

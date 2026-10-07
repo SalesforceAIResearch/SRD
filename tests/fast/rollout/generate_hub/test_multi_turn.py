@@ -128,8 +128,10 @@ def verify_samples(actual: Sample | list[Sample], expected: list[ExpectedSampleI
         )
         # Session server populates diagnostic metadata (token IDs,
         # trim config, mismatch analysis) that varies with mock setup.
-        # Strip these before comparing sample structure.
-        for key in ("tito_session_mismatch", "accumulated_token_ids", "max_trim_tokens"):
+        # round_number (multi_turn.generate's turn-count diagnostic, feeding
+        # --log-multi-turn) likewise varies with how many turns the mock stub
+        # ran. Strip these before comparing sample structure.
+        for key in ("tito_session_mismatch", "accumulated_token_ids", "max_trim_tokens", "round_number"):
             actual_partial.metadata.pop(key, None)
         assert actual_partial == expected_item.partial_sample
 

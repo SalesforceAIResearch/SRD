@@ -82,14 +82,18 @@ def expected_sample(
     multimodal_inputs: dict | None = None,
     multimodal_train_inputs: dict | None = None,
     loss_mask: list[int] | None | _Unset = _UNSET,
+    round_number: int = 1,
 ) -> Sample:
     actual_response_length = response_length if response_length is not None else len(RESPONSE_TOKENS)
+    is_multi_turn = variant in ("multi_turn_single_sample", "multi_turn_multi_samples")
     if isinstance(loss_mask, _Unset):
-        loss_mask = (
-            [1] * actual_response_length
-            if variant in ("multi_turn_single_sample", "multi_turn_multi_samples")
-            else None
-        )
+        loss_mask = [1] * actual_response_length if is_multi_turn else None
+
+    # multi_turn.generate stamps round_number (turn count so far) on every
+    # sample it returns. Default 1 covers the common "one inference call"
+    # case; callers whose scenario makes zero HTTP calls (e.g. the prompt
+    # already exceeds rollout_max_context_len) must pass round_number=0.
+    metadata = {"round_number": round_number} if is_multi_turn else {}
 
     return Sample(
         group_index=None,
@@ -108,7 +112,7 @@ def expected_sample(
         rollout_routed_experts=rollout_routed_experts,
         remove_sample=False,
         status=status,
-        metadata={},
+        metadata=metadata,
         train_metadata=None,
         non_generation_time=0.0,
         spec_info=spec_info or Sample.SpecInfo(),
@@ -334,6 +338,10 @@ class TestBoundaryConditions:
                 status=Sample.Status.TRUNCATED,
                 prompt_tokens=0,
                 loss_mask=None if variant == "multi_turn_single_sample" else _UNSET,
+                # The very first turn's payload is already None (prompt alone
+                # exceeds the context/length limit), so multi_turn.generate
+                # makes zero HTTP calls -> zero completed rounds.
+                round_number=0,
             )
         ]
 
@@ -378,6 +386,10 @@ class TestBoundaryConditions:
                 status=Sample.Status.TRUNCATED,
                 prompt_tokens=0,
                 loss_mask=None if variant == "multi_turn_single_sample" else _UNSET,
+                # The very first turn's payload is already None (prompt alone
+                # exceeds the context/length limit), so multi_turn.generate
+                # makes zero HTTP calls -> zero completed rounds.
+                round_number=0,
             )
         ]
 

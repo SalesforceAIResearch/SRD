@@ -1,0 +1,20 @@
+# --eval-config for the AGENTIC domain (webshop + alfworld combined, held-out sets).
+eval:
+  defaults:
+    max_response_len: 8192
+    top_p: 1.0
+    tool_key: tools
+    metadata_key: metadata
+  datasets:
+    - name: webshop
+      path: /root/data/webshop_data/webshop_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}
+    - name: alfworld_ood
+      path: /root/data/alfworld_data/alfworld_eval_ood.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}

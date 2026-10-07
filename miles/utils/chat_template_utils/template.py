@@ -151,6 +151,40 @@ def _normalize_value(value: Any) -> Any:
     return value
 
 
+def _normalize_tool_calls(value: Any) -> Any:
+    """Reduce each tool call to the (id, function.name, function.arguments) triple.
+
+    Every ``*_fixed.jinja`` template only ever reads ``tool_call.id``,
+    ``tool_call.function.name``/``tool_call.name`` and
+    ``tool_call.function.arguments``/``tool_call.arguments`` (confirmed via
+    grepping ``templates/*.jinja`` for ``tool_call.``) — so any OTHER key a
+    client library adds is template-irrelevant and must not affect equality.
+    Concretely: tau2-bench's own ``to_litellm_messages()`` (a pip dependency,
+    not ours) re-serializes tool calls with an extra top-level ``name`` key
+    and a ``type: "function"`` key that sglang's own OpenAI-compatible
+    response never includes — a naive dict-equality comparison here treated
+    that harmless round-trip as a genuinely new (and therefore role-
+    disallowed) appended message, 400-ing almost every real tau2 turn once
+    tool_calls were actually populated (see --sglang-tool-call-parser).
+    ``arguments`` is parsed as JSON when it's a string so a dict/string
+    round-trip (dict on the stored side, re-serialized string on tau2's
+    round-trip side) doesn't cause a spurious mismatch either.
+    """
+    if not value:
+        return None
+    normalized = []
+    for tc in value:
+        func = tc.get("function", tc)
+        args = func.get("arguments")
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except (TypeError, ValueError):
+                pass
+        normalized.append((tc.get("id"), func.get("name"), args))
+    return normalized
+
+
 def message_matches(stored: dict[str, Any], new: dict[str, Any]) -> bool:
     """Compare only the fields that affect chat-template tokenization.
 
@@ -160,7 +194,10 @@ def message_matches(stored: dict[str, Any], new: dict[str, Any]) -> bool:
     templates actually read: role, content, reasoning_content, tool_calls.
     """
     for key in _TEMPLATE_RELEVANT_KEYS:
-        if _normalize_value(stored.get(key)) != _normalize_value(new.get(key)):
+        stored_value, new_value = stored.get(key), new.get(key)
+        if key == "tool_calls":
+            stored_value, new_value = _normalize_tool_calls(stored_value), _normalize_tool_calls(new_value)
+        if _normalize_value(stored_value) != _normalize_value(new_value):
             return False
     return True
 

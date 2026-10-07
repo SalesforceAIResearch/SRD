@@ -1,0 +1,15 @@
+# --eval-config for AMO-Bench (50 IMO-level math problems from meituan-longcat/AMO-Bench).
+# Built by: python -m examples.SRD.data.build_amo_bench --out-dir /root/data/amo_bench
+eval:
+  defaults:
+    max_response_len: 16384
+    top_p: 1.0
+    tool_key: tools
+    metadata_key: metadata
+  datasets:
+    - name: amo_bench
+      path: ${oc.env:AMO_BENCH_DATA_DIR,/root/data/amo_bench}/amo_bench_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}

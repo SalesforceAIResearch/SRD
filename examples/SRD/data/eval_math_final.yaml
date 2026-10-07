@@ -1,0 +1,32 @@
+# --eval-config for the FINAL held-out MATH report: AIME-2024 + AIME-2025 + AMO-Bench in one eval.
+# Run with ablation/eval-amo-bench.sh (passes --sdpo-judge, which AMO's 11 description problems need).
+# Build the aime files (SDPO_REACT_PROMPT must match the trained arm's prompt) with:
+#   SDPO_REACT_PROMPT=minimal python -m examples.SRD.data.build_aime \
+#       --out-dir /root/data/aime
+# Paths are CONTAINER paths (/root/data == the enroot mount of /fsx/data/$USER).
+
+eval:
+  defaults:
+    max_response_len: 16384
+    top_p: 1.0
+    tool_key: tools
+    metadata_key: metadata
+  datasets:
+    - name: aime24
+      path: ${oc.env:AIME_DATA_DIR,/root/data/aime}/aime24_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}
+    - name: aime25
+      path: ${oc.env:AIME_DATA_DIR,/root/data/aime}/aime25_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}
+    - name: amo_bench
+      path: ${oc.env:AMO_BENCH_DATA_DIR,/root/data/amo_bench}/amo_bench_eval.jsonl
+      rm_type: null
+      n_samples_per_eval_prompt: ${oc.decode:${oc.env:SDPO_REACT_EVAL_N_SAMPLES,8}}
+      metadata_overrides:
+        generate_max_turns: ${oc.decode:${oc.env:SDPO_REACT_EVAL_MAX_TURNS,20}}

@@ -27,7 +27,17 @@ async def remote_rm(args, sample: Sample):
             return await resp.json()
 
 
-async def async_rm(args, sample: Sample, **kwargs):
+async def async_rm(args, sample: Sample, evaluation: bool = False, **kwargs):
+    # --eval-custom-rm-path is documented (see arguments.py) as an eval-only grader
+    # that runs "instead of" the training reward -- --group-rm examples rely on
+    # this since their group reward function can't run in eval (no group step).
+    # Non-group-rm examples reach this same fork, but previously --custom-rm-path
+    # always won regardless of `evaluation`, so an eval-only grader (e.g. one that
+    # does real math-equivalence checking instead of the training-time strict
+    # \boxed{} string match) never actually ran during eval.
+    if evaluation and getattr(args, "eval_custom_rm_path", None) is not None:
+        rm_function = load_function(args.eval_custom_rm_path)
+        return await rm_function(args, sample, **kwargs)
     if args.custom_rm_path is not None:
         rm_function = load_function(args.custom_rm_path)
         return await rm_function(args, sample, **kwargs)
@@ -82,6 +92,13 @@ async def batched_async_rm(
             ), f"Overriding sample.reward from {sample.reward} to {reward}, is this intended?"
             sample.reward = reward
         return None
+
+    # --eval-custom-rm-path's documented signature is per-sample (`eval_rm(args, sample)`),
+    # not batched like --custom-rm-path, so route through async_rm per-sample instead of
+    # the batch-mode custom_rm_path function below.
+    if kwargs.get("evaluation") and getattr(args, "eval_custom_rm_path", None) is not None:
+        tasks = [async_rm(args, sample, **kwargs) for sample in samples]
+        return await asyncio.gather(*tasks)
 
     if args.custom_rm_path is not None:
         # Ensure the custom reward function is implemented in batch mode
