@@ -12,9 +12,9 @@
   <em>Salesforce AI Research · UC San Diego · Texas A&amp;M University · Stanford University</em>
 </p>
 
-<a href="#"><img src="https://img.shields.io/badge/arXiv-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="arXiv"></a>
+<a href="https://arxiv.org/abs/2610.08077"><img src="https://img.shields.io/badge/Paper-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="Paper"></a>
 <a href="#"><img src="https://img.shields.io/badge/Project-1F72B8?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
-<a href="#"><img src="https://img.shields.io/badge/Github-181717?style=for-the-badge&logo=github&logoColor=white" alt="Github"></a>
+<a href="https://github.com/SalesforceAIResearch/SRD"><img src="https://img.shields.io/badge/Github-181717?style=for-the-badge&logo=github&logoColor=white" alt="Github"></a>
 
 <!-- Add the method teaser here once finalized, e.g.:
 <img src="docs/assets/srd-teaser.png" alt="SRD overview" width="85%"/> -->
@@ -25,17 +25,17 @@
 
 ## 📰 News
 
-- **October 2026** 🚀 SRD code release
+- **[Oct 2026]** 🚀 SRD [preprint](https://arxiv.org/abs/2610.08077) released!
 
 ## TL;DR
 
 **Self-Retrospection Distillation (SRD)** is an implementation of *prospective
-learning*: it aligns the agent's **pre-interaction estimate** of what a task and
+learning*: it aligns the agent's **pre-interaction anticipation** of what a task and
 environment will demand with the **summary of experience** gathered *after*
 interacting. As a lightweight auxiliary objective, SRD guides and reinforces RLVR
 and self-distillation training rather than replacing it. We find that it brings
-consistent gains over the base **GRPO / OPSD / RLSD** algorithms across tool-use,
-deep-search, and simple agentic tasks.
+consistent gains over the base **GRPO / OPSD / RLSD** algorithms across tool-use
+reasoning, deep research, and simple agentic tasks.
 
 ## 🌟 Overview
 
@@ -96,12 +96,9 @@ deep-search, and simple agentic tasks.
 
 5. **Data.** Training/eval sets are built from public upstreams on first run by the
    run scripts' `[ -f … ] || build_*` guards (DAPO-Math-17k, LiveCodeBench,
-   FlashRAG, ALFWorld, WebShop, …). The only data committed to this repo is the
-   pass@k-filtered search eval (`examples/SRD/data/search_eval/`, 200 prompts),
-   which is not reproducible from the builders.
-
-A full, ordered fresh-host bring-up (host prerequisites, sidecars, image build) is
-in [`docs/bkp/README-bringup.md`](docs/bkp/README-bringup.md).
+   FlashRAG, ALFWorld, WebShop, …). The two pass@k-filtered search-eval datasets
+   (HotpotQA and 2WikiMultiHopQA, 200 prompts) are already prepared in this repo
+   (`examples/SRD/data/search_eval/`), since they are not reproducible from the builders.
 
 ## ⚡ Quick start
 
@@ -121,10 +118,7 @@ in [`docs/bkp/README-bringup.md`](docs/bkp/README-bringup.md).
 > step-by-step skill that checks preconditions, writes `.env`, and launches a run
 > end-to-end (e.g. *“follow assets/quickstart/SKILL.md to launch GRPO+SRD on 4B”*).
 
-All run scripts live in `examples/SRD/ablation/`
-(`run-qwen3.5-{4B,9B,35B-A3B}-sdpo-react-ablation-{mathcodesearch,alfworld-webshop}.sh`)
-and are driven by one launcher, `examples/SRD/enroot-run-sdpo-react.sh`, selected by
-two switches (model × domain) and two ablation axes (algorithm × arm):
+Two reference configs, via the launcher `examples/SRD/enroot-run-sdpo-react.sh`:
 
 ```bash
 export SDPO_REACT_LOCAL_ROOT=/path/on/a/big/disk
@@ -140,14 +134,10 @@ SDPO_ABLATION_ALGO=sdpo  SDPO_ABLATION_ARM=e \
   bash examples/SRD/enroot-run-sdpo-react.sh
 ```
 
-**SRD is arm `e`** (`grpo e` = GRPO+SRD, `sdpo e` = OPSD+SRD; the launcher value for
-OPSD is `sdpo`). Arm `a` is the no-skill control. Swap `qwen3.5-4B` →
-`qwen3.5-9B` / `qwen3.5-35B-A3B` for the other scales. The launcher starts the
-required sidecars (code sandbox, search retriever, or WebShop/ALFWorld)
-automatically. For the **full ablation matrix** — all arms × algorithms, the exact
-flags each produces, shared hyperparameters, and every environment override — and
-for running the scripts directly, see
-[`docs/srd/ablations.md`](docs/srd/ablations.md).
+Arm `e` = SRD, arm `a` = no-skill baseline; algo `sdpo` = OPSD. Swap `qwen3.5-4B`
+→ `9B` / `35B-A3B` for other scales. For the detailed **algorithm × model** matrix
+— every arm, the exact flags, hyperparameters, and env overrides — see
+**[`docs/srd/ablations.md`](docs/srd/ablations.md)**.
 
 ### Where things land
 
@@ -182,7 +172,6 @@ examples/SRD/
 ├── ablation/                             # run scripts (model × domain) + held-out eval harnesses
 └── enroot-run-sdpo-react.sh              # one-click launcher
 docs/srd/                                 # ablation arms + hyperparameter reference
-docs/bkp/                                 # detailed bring-up notes + upstream framework README
 ```
 
 ## 🔬 Analysis & Findings
@@ -191,7 +180,7 @@ docs/bkp/                                 # detailed bring-up notes + upstream f
 <summary><b>Main results</b></summary>
 <br/>
 <p align="center"><img src="assets/figs/table-main.png" width="95%" alt="Main results"></p>
-<p align="center"><sub><b>Table 1.</b> Main results on Math, Code, Search, and Agentic benchmarks (avg@8 pass rate, %). Each <b>+SRD</b> row adds SRD — distilling the pitfall hindsight — on top of its base algorithm (GRPO / OPSD / RLSD); the <i>Improved Perf.</i> rows report the absolute gain.</sub></p>
+<p align="center"><sub><b>Table 1.</b> Main results (avg@8 pass rate, %) on Math, Code, Search, and Agentic. SRD <b>broadly improves GRPO / OPSD / RLSD and transfers beyond training conditions</b> (format shift, unseen ALFWorld, 10×-longer BrowseComp-Plus horizons), <b>mitigates the instability of pure self-distillation</b>, and <b>remains effective as the base policy gets stronger</b>; <i>+SRD</i> rows add SRD on each base algorithm and <i>Improved Perf.</i> rows give the gain.</sub></p>
 </details>
 
 <details>
@@ -218,18 +207,19 @@ docs/bkp/                                 # detailed bring-up notes + upstream f
 </p>
 
 We also thank the following open-source projects:
-- <img src="https://github.com/sgl-project.png?size=40" height="18" align="absmiddle"> **[SGLang](https://github.com/sgl-project/sglang)**, <img src="https://github.com/NVIDIA.png?size=40" height="18" align="absmiddle"> **[Megatron-LM](https://github.com/NVIDIA/Megatron-LM)**, and <img src="assets/logos/radixark.png" height="18" align="absmiddle">[**miles**](https://github.com/radixark/miles) for the seamless adaptation and the effort behind the foundational training and inference infrastructure.
+- <img src="https://github.com/sgl-project.png?size=40" height="18" align="absmiddle"> **[SGLang](https://github.com/sgl-project/sglang)**, <img src="https://github.com/NVIDIA.png?size=40" height="18" align="absmiddle"> **[Megatron-LM](https://github.com/NVIDIA/Megatron-LM)**, and <img src="assets/logos/radixark.png" height="18" align="absmiddle">[**miles** ](https://github.com/radixark/miles) for the seamless adaptation and the effort behind the foundational training and inference infrastructure.
 - <img src="https://github.com/i-DeepSearch.png?size=40" height="18" align="absmiddle"> *[When observation be essential](https://github.com/i-DeepSearch/observation-masking)* and <img src="assets/logos/openresearcher.png" height="18" align="absmiddle"> **[OpenResearcher](https://github.com/TIGER-AI-Lab/OpenResearcher)** for the early-stage exploration and construction of the deep-research and OpenResearcher components.
 - <img src="https://github.com/deepseek-ai.png?size=40" height="18" align="absmiddle"> **[DeepSeek-AI](https://huggingface.co/deepseek-ai)**, <img src="https://github.com/QwenLM.png?size=40" height="18" align="absmiddle"> **[Qwen-AI](https://huggingface.co/Qwen)**, <img src="https://github.com/siyan-zhao.png?size=40" height="18" align="absmiddle"> **[OPSD](https://github.com/siyan-zhao/OPSD)**, and <img src="https://github.com/lasgroup.png?size=40" height="18" align="absmiddle"> **[LASGroup](https://github.com/lasgroup/SDPO)** for the early-stage exploration on the algorithmic side.
 
 
-## 📚 Citation
+## Citation
 
 ```bibtex
-@inproceedings{srd2027,
-  title     = {Self-Retrospection Distillation: Turning Post-hoc Experiences into Prior Foresight},
-  author    = {Zhang, Haoxiang and Chen, Qinglin and Hayashi, Hiroaki and Li, Zhuofeng and Zhang, Siming and Zhang, Jiaxin and Chen, Jixuan and Wu, Fang and Lu, Pan and Savarese, Silvio and McAuley, Julian and Wu, Chien-Sheng},
-  year      = {2027}
+@article{zhang2026srd,
+  title   = {Self-Retrospection Distillation: Turning Post-hoc Experiences into Prior Foresight},
+  author  = {Zhang, Haoxiang and Chen, Qinglin and Hayashi, Hiroaki and Li, Zhuofeng and Zhang, Siming and Zhang, Jiaxin and Chen, Jixuan and Wu, Fang and Lu, Pan and Savarese, Silvio and McAuley, Julian and Wu, Chien-Sheng},
+  journal = {arXiv preprint arXiv:2610.08077},
+  year    = {2026}
 }
 ```
 
