@@ -12,8 +12,9 @@
   <em>Salesforce AI Research · UC San Diego · Texas A&amp;M University · Stanford University</em>
 </p>
 
+
 <a href="https://arxiv.org/abs/2610.08077"><img src="https://img.shields.io/badge/Paper-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="Paper"></a>
-<a href="#"><img src="https://img.shields.io/badge/Project-1F72B8?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
+<a href="#"><img src="https://img.shields.io/badge/Blog-1F72B8?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI%2BPHBhdGggZD0iTTMgMTcuMjVWMjFoMy43NUwxNy44MSA5Ljk0bC0zLjc1LTMuNzVMMyAxNy4yNXpNMjAuNzEgNy4wNGMuMzktLjM5LjM5LTEuMDIgMC0xLjQxbC0yLjM0LTIuMzRhLjk5Ni45OTYgMCAwIDAtMS40MSAwbC0xLjgzIDEuODMgMy43NSAzLjc1IDEuODMtMS44M3oiLz48L3N2Zz4%3D&logoColor=white" alt="Blog"></a>
 <a href="https://github.com/SalesforceAIResearch/SRD"><img src="https://img.shields.io/badge/Github-181717?style=for-the-badge&logo=github&logoColor=white" alt="Github"></a>
 
 <!-- Add the method teaser here once finalized, e.g.:
@@ -25,7 +26,8 @@
 
 ## 📰 News
 
-- **[Oct 2026]** 🚀 SRD [preprint](https://arxiv.org/abs/2610.08077) released!
+- **[Oct. 8]** 🤗 SRD ranked [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08077) #1!
+- **[Oct. 6]** 🚀 SRD [preprint](https://arxiv.org/abs/2610.08077) released!
 
 ## TL;DR
 
@@ -113,7 +115,7 @@ reasoning, deep research, and simple agentic tasks.
 
 ### Run
 
-> **One-click for coding agents.** Point Claude Code, Codex, or any coding agent at
+> 🤖 **One-click for coding agents.** Point Claude Code, Codex, or any coding agent at
 > **[`assets/quickstart/SKILL.md`](assets/quickstart/SKILL.md)** — a self-contained,
 > step-by-step skill that checks preconditions, writes `.env`, and launches a run
 > end-to-end (e.g. *“follow assets/quickstart/SKILL.md to launch GRPO+SRD on 4B”*).
@@ -207,7 +209,7 @@ docs/srd/                                 # ablation arms + hyperparameter refer
 </p>
 
 We also thank the following open-source projects:
-- <img src="https://github.com/sgl-project.png?size=40" height="18" align="absmiddle"> **[SGLang](https://github.com/sgl-project/sglang)**, <img src="https://github.com/NVIDIA.png?size=40" height="18" align="absmiddle"> **[Megatron-LM](https://github.com/NVIDIA/Megatron-LM)**, and <img src="assets/logos/radixark.png" height="18" align="absmiddle">[**miles** ](https://github.com/radixark/miles) for the seamless adaptation and the effort behind the foundational training and inference infrastructure.
+- <img src="https://github.com/sgl-project.png?size=40" height="18" align="absmiddle"> **[SGLang](https://github.com/sgl-project/sglang)**, <img src="https://github.com/NVIDIA.png?size=40" height="18" align="absmiddle"> **[Megatron-LM](https://github.com/NVIDIA/Megatron-LM)**, and <img src="assets/logos/radixark.png" height="18" align="absmiddle"> [**miles**](https://github.com/radixark/miles) for the seamless adaptation and the effort behind the foundational training and inference infrastructure.
 - <img src="https://github.com/i-DeepSearch.png?size=40" height="18" align="absmiddle"> *[When observation be essential](https://github.com/i-DeepSearch/observation-masking)* and <img src="assets/logos/openresearcher.png" height="18" align="absmiddle"> **[OpenResearcher](https://github.com/TIGER-AI-Lab/OpenResearcher)** for the early-stage exploration and construction of the deep-research and OpenResearcher components.
 - <img src="https://github.com/deepseek-ai.png?size=40" height="18" align="absmiddle"> **[DeepSeek-AI](https://huggingface.co/deepseek-ai)**, <img src="https://github.com/QwenLM.png?size=40" height="18" align="absmiddle"> **[Qwen-AI](https://huggingface.co/Qwen)**, <img src="https://github.com/siyan-zhao.png?size=40" height="18" align="absmiddle"> **[OPSD](https://github.com/siyan-zhao/OPSD)**, and <img src="https://github.com/lasgroup.png?size=40" height="18" align="absmiddle"> **[LASGroup](https://github.com/lasgroup/SDPO)** for the early-stage exploration on the algorithmic side.
 
